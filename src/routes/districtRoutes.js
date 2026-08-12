@@ -1,14 +1,32 @@
 const express = require("express");
-const router = express.Router();
+
+const router =
+    express.Router();
+
 const {
     getDistricts,
     getDistrictsByProvince
-} = require("../controllers/districtController");
+} = require(
+    "../controllers/districtController"
+);
 
-// GET tất cả quận/huyện
-router.get("/", getDistricts);
 
-// GET quận/huyện theo tỉnh/thành
-router.get("/by-province", getDistrictsByProvince);
+// ========================================
+// GET TẤT CẢ QUẬN / HUYỆN
+// ========================================
+
+router.get(
+    "/",
+    getDistricts
+);
+
+// ========================================
+// GET QUẬN / HUYỆN THEO TỈNH
+// ========================================
+
+router.get(
+    "/by-province",
+    getDistrictsByProvince
+);
 
 module.exports = router;

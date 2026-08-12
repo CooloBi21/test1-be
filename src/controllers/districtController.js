@@ -1,11 +1,13 @@
-const districtsData = require("../data/quan_huyen.json");
+const districtsData =
+    require("../data/quan_huyen.json");
 
-// Chuyển dữ liệu thành array
+
 const getDistrictList = () => {
 
     return Array.isArray(districtsData)
         ? districtsData
         : Object.values(districtsData);
+
 };
 
 // ========================================
@@ -14,37 +16,68 @@ const getDistrictList = () => {
 
 const getDistricts = (req, res) => {
 
-    const districts = getDistrictList();
+    const districts =
+        getDistrictList();
 
     res.json(districts);
 
 };
+
 
 // ========================================
 // GET DISTRICTS BY PROVINCE
 // ========================================
 
-const getDistrictsByProvince = (req, res) => {
+const getDistrictsByProvince = (
+    req,
+    res
+) => {
 
-    const { parentCode } = req.query;
+    const {
+        parentCode
+    } = req.query;
+
+    // ========================================
+    // VALIDATE
+    // ========================================
 
     if (!parentCode) {
 
         return res.status(400).json({
-            message: "parentCode là bắt buộc"
+
+            message:
+                "parentCode là bắt buộc"
         });
     }
 
-    const districts = getDistrictList().filter(
-        (district) =>
-            String(district.parent_code) ===
-            String(parentCode)
-    );
+    // ========================================
+    // FILTER
+    // ========================================
+
+    const districts =
+        getDistrictList().filter(
+
+            (district) =>
+
+                String(
+                    district.parent_code
+                ) ===
+                String(parentCode)
+
+        );
+
+    // ========================================
+    // RESPONSE
+    // ========================================
 
     res.json(districts);
+
 };
 
 module.exports = {
+
     getDistricts,
+
     getDistrictsByProvince
+
 };
