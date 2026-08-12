@@ -102,7 +102,8 @@ const importData = async () => {
         // =====================================
 
         console.log("\n3. Import rooms...");
-
+        console.log("roomsData is array:", Array.isArray(roomsData));
+        console.log("rooms count:", roomsData.length);
 
         for (const room of roomsData) {
 
