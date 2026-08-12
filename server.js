@@ -8,6 +8,9 @@ const roomRoutes = require("./src/routes/roomRoutes");
 const provinceRoutes = require("./src/routes/provinceRoutes");
 const districtRoutes = require("./src/routes/districtRoutes");
 
+// 1. IMPORT SWAGGER
+const { setupSwagger } = require("./src/config/swagger");
+
 const app = express();
 
 // ========================================
@@ -18,12 +21,19 @@ app.use(express.json());
 app.use(cors());
 
 // ========================================
+// SWAGGER DOCS
+// ========================================
+
+setupSwagger(app);
+
+// ========================================
 // ROOT
 // ========================================
 
 app.get("/", (req, res) => {
     res.json({
         message: "Phong Tro Backend is running!",
+        swaggerDocs: "http://localhost:5000/api-docs"
     });
 });
 
@@ -57,4 +67,5 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Backend running on port ${PORT}`);
+    console.log(`Swagger UI available at http://localhost:${PORT}/api-docs`);
 });
