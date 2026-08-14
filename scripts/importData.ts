@@ -1,9 +1,21 @@
 import "dotenv/config";
-import pool from "../src/config/database";
+import { Pool } from "pg";
 
 import roomsData from "../src/data/room.json";
 import provincesData from "../src/data/tinh_tp.json";
 import districtsData from "../src/data/quan_huyen.json";
+
+// Cấu hình kết nối PostgreSQL trực tiếp từ .env
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
 
 // Interface cho cấu trúc dữ liệu Tỉnh/Thành
 interface ProvinceInput {
