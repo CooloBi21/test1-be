@@ -6,26 +6,26 @@ export declare class AuthController {
     register(dto: RegisterDto): Promise<{
         message: string;
         user: {
+            created_at: Date | null;
             id: number;
             full_name: string;
             email: string;
             phone: string | null;
             avatar: string | null;
             role: string | null;
-            created_at: Date | null;
         };
     }>;
     login(dto: LoginDto): Promise<{
         message: string;
         access_token: string;
         user: {
+            created_at: Date | null;
             id: number;
             full_name: string;
             email: string;
             phone: string | null;
             avatar: string | null;
             role: string | null;
-            created_at: Date | null;
         };
     }>;
     getProfile(req: any): any;

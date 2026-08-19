@@ -16,9 +16,13 @@ exports.RoomsService = void 0;
 const common_1 = require("@nestjs/common");
 const pg_1 = require("pg");
 const database_module_1 = require("../database/database.module");
+const prisma_service_1 = require("../prisma/prisma.service");
+const notifications_service_1 = require("../notifications/notifications.service");
 let RoomsService = class RoomsService {
-    constructor(pool) {
+    constructor(pool, prisma, notificationsService) {
         this.pool = pool;
+        this.prisma = prisma;
+        this.notificationsService = notificationsService;
     }
     async getRooms(filterDto) {
         const { city, district, minPrice, maxPrice, minArea, maxArea, userId } = filterDto;
@@ -104,34 +108,126 @@ let RoomsService = class RoomsService {
       `, [title, thumbnail || null, price, area, city, district, content || null, userId || null]);
         return result.rows[0];
     }
-    async updateRoom(id, dto) {
-        const { title, thumbnail, price, area, city, district, content } = dto;
+    async updateRoom(id, dto, currentUserId) {
+        const roomCheck = await this.pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]);
+        if (roomCheck.rows.length === 0) {
+            throw new common_1.NotFoundException('Không tìm thấy phòng');
+        }
+        const oldRoom = roomCheck.rows[0];
+        if (Number(oldRoom.user_id) !== Number(currentUserId)) {
+            throw new common_1.ForbiddenException('Bạn không có quyền chỉnh sửa bài đăng này');
+        }
+        const changes = [];
+        const fieldsToCompare = ['price', 'title', 'thumbnail', 'area', 'city', 'district', 'content'];
+        const fieldNamesVN = {
+            price: 'giá thuê',
+            title: 'tiêu đề',
+            thumbnail: 'ảnh đại diện',
+            area: 'diện tích',
+            city: 'tỉnh/thành phố',
+            district: 'quận/huyện',
+            content: 'nội dung mô tả',
+        };
+        fieldsToCompare.forEach((field) => {
+            if (dto[field] !== undefined) {
+                let isChanged = false;
+                if (field === 'price' || field === 'area') {
+                    const oldNum = oldRoom[field] !== null && oldRoom[field] !== undefined ? Number(oldRoom[field]) : 0;
+                    const newNum = dto[field] !== null && dto[field] !== undefined ? Number(dto[field]) : 0;
+                    if (oldNum !== newNum) {
+                        isChanged = true;
+                    }
+                }
+                else {
+                    const oldStr = oldRoom[field] ? String(oldRoom[field]).trim() : '';
+                    const newStr = dto[field] ? String(dto[field]).trim() : '';
+                    if (oldStr !== newStr) {
+                        isChanged = true;
+                    }
+                }
+                if (isChanged) {
+                    changes.push({
+                        field,
+                        oldValue: oldRoom[field],
+                        newValue: dto[field],
+                    });
+                }
+            }
+        });
+        if (changes.length === 0) {
+            return { data: oldRoom, changes: [] };
+        }
+        const { title, thumbnail, price, area, city, district, content } = { ...oldRoom, ...dto };
         const result = await this.pool.query(`
       UPDATE rooms
       SET title = $1, thumbnail = $2, price = $3, area = $4, city = $5, district = $6, content = $7
       WHERE id = $8
       RETURNING *
       `, [title, thumbnail || null, price, area, city, district, content || null, id]);
-        if (result.rows.length === 0) {
-            throw new common_1.NotFoundException('Không tìm thấy phòng');
+        const updatedRoom = result.rows[0];
+        const savedUsers = await this.prisma.saved_posts.findMany({
+            where: { room_id: Number(id) },
+            select: { user_id: true },
+        });
+        const changedFieldNames = changes.map((c) => fieldNamesVN[c.field] || c.field).join(', ');
+        const priceChange = changes.find((c) => c.field === 'price');
+        let notiTitle = `Phòng đã lưu thay đổi ${changedFieldNames}`;
+        let notiBody = `Phòng "${updatedRoom.title}" vừa cập nhật: ${changedFieldNames}.`;
+        if (priceChange && changes.length === 1) {
+            notiTitle = 'Phòng đã lưu thay đổi giá';
+            notiBody = `Phòng "${updatedRoom.title}" đổi giá từ ${Number(priceChange.oldValue).toLocaleString('vi-VN')}đ sang ${Number(priceChange.newValue).toLocaleString('vi-VN')}đ.`;
         }
-        return result.rows[0];
+        for (const item of savedUsers) {
+            if (Number(item.user_id) !== Number(updatedRoom.user_id)) {
+                await this.notificationsService.createNotification({
+                    user_id: item.user_id,
+                    type: 'saved_room_updated',
+                    title: notiTitle,
+                    body: notiBody,
+                    target_url: `/rooms/${id}`,
+                    entity_type: 'room',
+                    entity_id: Number(id),
+                });
+            }
+        }
+        return { data: updatedRoom, changes };
     }
-    async deleteRoom(id) {
-        const result = await this.pool.query(`DELETE FROM rooms WHERE id = $1 RETURNING *`, [id]);
-        if (result.rows.length === 0) {
+    async deleteRoom(id, currentUserId) {
+        const roomCheck = await this.pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]);
+        if (roomCheck.rows.length === 0) {
             throw new common_1.NotFoundException('Không tìm thấy phòng');
         }
-        return {
-            message: 'Xóa phòng thành công',
-            data: result.rows[0],
-        };
+        const roomData = roomCheck.rows[0];
+        if (Number(roomData.user_id) !== Number(currentUserId)) {
+            throw new common_1.ForbiddenException('Bạn không có quyền xóa bài đăng này');
+        }
+        const savedUsers = await this.prisma.saved_posts.findMany({
+            where: { room_id: Number(id) },
+            select: { user_id: true },
+        });
+        const result = await this.pool.query(`DELETE FROM rooms WHERE id = $1 RETURNING *`, [id]);
+        for (const item of savedUsers) {
+            if (Number(item.user_id) !== Number(roomData.user_id)) {
+                await this.notificationsService.createNotification({
+                    user_id: item.user_id,
+                    type: 'saved_room_updated',
+                    title: 'Tin đã lưu đã bị gỡ',
+                    body: `Phòng "${roomData.title}" mà bạn đã lưu vừa bị chủ nhà xóa/gỡ khỏi hệ thống.`,
+                    target_url: `/saved-posts`,
+                    entity_type: 'room',
+                    entity_id: Number(id),
+                });
+            }
+        }
+        return { message: 'Xóa phòng thành công', data: result.rows[0] };
     }
 };
 exports.RoomsService = RoomsService;
 exports.RoomsService = RoomsService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, common_1.Inject)(database_module_1.DATABASE_POOL)),
-    __metadata("design:paramtypes", [pg_1.Pool])
+    __metadata("design:paramtypes", [pg_1.Pool,
+        prisma_service_1.PrismaService,
+        notifications_service_1.NotificationsService])
 ], RoomsService);
 //# sourceMappingURL=rooms.service.js.map

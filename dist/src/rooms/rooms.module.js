@@ -10,11 +10,14 @@ exports.RoomsModule = void 0;
 const common_1 = require("@nestjs/common");
 const rooms_controller_1 = require("./rooms.controller");
 const rooms_service_1 = require("./rooms.service");
+const prisma_module_1 = require("../prisma/prisma.module");
+const notifications_module_1 = require("../notifications/notifications.module");
 let RoomsModule = class RoomsModule {
 };
 exports.RoomsModule = RoomsModule;
 exports.RoomsModule = RoomsModule = __decorate([
     (0, common_1.Module)({
+        imports: [prisma_module_1.PrismaModule, notifications_module_1.NotificationsModule],
         controllers: [rooms_controller_1.RoomsController],
         providers: [rooms_service_1.RoomsService],
     })

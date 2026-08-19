@@ -11,6 +11,7 @@ import { SavedPostsModule } from './saved-posts/saved-posts.module';
 import { RoomViewsModule } from './room-views/room-views.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { ChatModule } from './chat/chat.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ChatModule } from './chat/chat.module';
     RoomViewsModule,
     ReviewsModule,
     ChatModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

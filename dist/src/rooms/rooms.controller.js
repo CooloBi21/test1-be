@@ -18,6 +18,7 @@ const swagger_1 = require("@nestjs/swagger");
 const rooms_service_1 = require("./rooms.service");
 const get_rooms_filter_dto_1 = require("./dto/get-rooms-filter.dto");
 const create_room_dto_1 = require("./dto/create-room.dto");
+const update_room_dto_1 = require("./dto/update-room.dto");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 let RoomsController = class RoomsController {
     constructor(roomsService) {
@@ -43,11 +44,19 @@ let RoomsController = class RoomsController {
         }
         return this.roomsService.createRoom(dto, Number(userId));
     }
-    updateRoom(id, dto) {
-        return this.roomsService.updateRoom(id, dto);
+    updateRoom(id, dto, req) {
+        const userId = req.user?.id || req.user?.userId;
+        if (!userId) {
+            throw new common_1.UnauthorizedException('Không thể xác thực thông tin người dùng');
+        }
+        return this.roomsService.updateRoom(id, dto, Number(userId));
     }
-    deleteRoom(id) {
-        return this.roomsService.deleteRoom(id);
+    deleteRoom(id, req) {
+        const userId = req.user?.id || req.user?.userId;
+        if (!userId) {
+            throw new common_1.UnauthorizedException('Không thể xác thực thông tin người dùng');
+        }
+        return this.roomsService.deleteRoom(id, Number(userId));
     }
 };
 exports.RoomsController = RoomsController;
@@ -95,8 +104,9 @@ __decorate([
     (0, swagger_1.ApiOperation)({ summary: 'Cập nhật thông tin phòng trọ' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, create_room_dto_1.CreateRoomDto]),
+    __metadata("design:paramtypes", [String, update_room_dto_1.UpdateRoomDto, Object]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "updateRoom", null);
 __decorate([
@@ -105,8 +115,9 @@ __decorate([
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Xóa phòng trọ' }),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "deleteRoom", null);
 exports.RoomsController = RoomsController = __decorate([

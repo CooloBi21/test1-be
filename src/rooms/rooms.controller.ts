@@ -6,6 +6,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
 import { GetRoomsFilterDto } from './dto/get-rooms-filter.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Rooms')
@@ -43,11 +44,9 @@ export class RoomsController {
   @ApiOperation({ summary: 'Tạo phòng trọ mới' })
   createRoom(@Body() dto: CreateRoomDto, @Req() req: any) {
     const userId = req.user?.id || req.user?.userId;
-
     if (!userId) {
       throw new UnauthorizedException('Không thể xác thực thông tin người dùng');
     }
-
     return this.roomsService.createRoom(dto, Number(userId));
   }
 
@@ -55,15 +54,27 @@ export class RoomsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cập nhật thông tin phòng trọ' })
-  updateRoom(@Param('id') id: string, @Body() dto: CreateRoomDto) {
-    return this.roomsService.updateRoom(id, dto);
+  updateRoom(
+    @Param('id') id: string, 
+    @Body() dto: UpdateRoomDto, 
+    @Req() req: any
+  ) {
+    const userId = req.user?.id || req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Không thể xác thực thông tin người dùng');
+    }
+    return this.roomsService.updateRoom(id, dto, Number(userId));
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Xóa phòng trọ' })
-  deleteRoom(@Param('id') id: string) {
-    return this.roomsService.deleteRoom(id);
+  deleteRoom(@Param('id') id: string, @Req() req: any) {
+    const userId = req.user?.id || req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('Không thể xác thực thông tin người dùng');
+    }
+    return this.roomsService.deleteRoom(id, Number(userId));
   }
 }

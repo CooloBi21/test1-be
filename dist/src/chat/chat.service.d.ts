@@ -4,17 +4,17 @@ export declare class ChatService {
     constructor(prisma: PrismaService);
     getConversations(userId: number): Promise<({
         messages: {
-            id: number;
+            is_read: boolean;
             created_at: Date | null;
+            id: number;
             conversation_id: number;
             sender_id: number;
             text: string;
-            is_read: boolean;
         }[];
         room: {
             title: string;
-            thumbnail: string;
             id: number;
+            thumbnail: string;
         };
         user1: {
             id: number;
@@ -27,8 +27,8 @@ export declare class ChatService {
             avatar: string;
         };
     } & {
-        id: number;
         created_at: Date | null;
+        id: number;
         room_id: number | null;
         updated_at: Date | null;
         user_1_id: number;
@@ -42,16 +42,16 @@ export declare class ChatService {
             avatar: string;
         };
     } & {
-        id: number;
+        is_read: boolean;
         created_at: Date | null;
+        id: number;
         conversation_id: number;
         sender_id: number;
         text: string;
-        is_read: boolean;
     })[]>;
     createOrGetConversation(user1Id: number, user2Id: number, roomId?: number): Promise<{
-        id: number;
         created_at: Date | null;
+        id: number;
         room_id: number | null;
         updated_at: Date | null;
         user_1_id: number;
@@ -64,12 +64,12 @@ export declare class ChatService {
             avatar: string;
         };
     } & {
-        id: number;
+        is_read: boolean;
         created_at: Date | null;
+        id: number;
         conversation_id: number;
         sender_id: number;
         text: string;
-        is_read: boolean;
     }>;
     markAsRead(conversationId: number, userId: number): Promise<{
         success: boolean;

@@ -4,17 +4,17 @@ export declare class ChatController {
     constructor(chatService: ChatService);
     getConversations(req: any): Promise<({
         messages: {
-            id: number;
+            is_read: boolean;
             created_at: Date | null;
+            id: number;
             conversation_id: number;
             sender_id: number;
             text: string;
-            is_read: boolean;
         }[];
         room: {
             title: string;
-            thumbnail: string;
             id: number;
+            thumbnail: string;
         };
         user1: {
             id: number;
@@ -27,8 +27,8 @@ export declare class ChatController {
             avatar: string;
         };
     } & {
-        id: number;
         created_at: Date | null;
+        id: number;
         room_id: number | null;
         updated_at: Date | null;
         user_1_id: number;
@@ -42,19 +42,19 @@ export declare class ChatController {
             avatar: string;
         };
     } & {
-        id: number;
+        is_read: boolean;
         created_at: Date | null;
+        id: number;
         conversation_id: number;
         sender_id: number;
         text: string;
-        is_read: boolean;
     })[]>;
     createOrGetConversation(body: {
         targetUserId: number;
         roomId?: number;
     }, req: any): Promise<{
-        id: number;
         created_at: Date | null;
+        id: number;
         room_id: number | null;
         updated_at: Date | null;
         user_1_id: number;

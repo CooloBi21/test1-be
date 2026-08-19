@@ -20,6 +20,7 @@ const saved_posts_module_1 = require("./saved-posts/saved-posts.module");
 const room_views_module_1 = require("./room-views/room-views.module");
 const reviews_module_1 = require("./reviews/reviews.module");
 const chat_module_1 = require("./chat/chat.module");
+const notifications_module_1 = require("./notifications/notifications.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -38,6 +39,7 @@ exports.AppModule = AppModule = __decorate([
             room_views_module_1.RoomViewsModule,
             reviews_module_1.ReviewsModule,
             chat_module_1.ChatModule,
+            notifications_module_1.NotificationsModule,
         ],
     })
 ], AppModule);
