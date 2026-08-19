@@ -4,12 +4,14 @@ import { CreateRoomDto } from './dto/create-room.dto';
 export declare class RoomsService {
     private readonly pool;
     constructor(pool: Pool);
-    getRooms(filterDto: GetRoomsFilterDto): Promise<{
+    getRooms(filterDto: GetRoomsFilterDto & {
+        userId?: number;
+    }): Promise<{
         total: number;
         data: any[];
     }>;
     getRoomById(id: string): Promise<any>;
-    createRoom(dto: CreateRoomDto): Promise<any>;
+    createRoom(dto: CreateRoomDto, userId?: number): Promise<any>;
     updateRoom(id: string, dto: CreateRoomDto): Promise<any>;
     deleteRoom(id: string): Promise<{
         message: string;

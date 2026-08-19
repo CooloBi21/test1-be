@@ -14,6 +14,12 @@ const provinces_module_1 = require("./provinces/provinces.module");
 const districts_module_1 = require("./districts/districts.module");
 const rooms_module_1 = require("./rooms/rooms.module");
 const candlestick_module_1 = require("./candlestick/candlestick.module");
+const prisma_module_1 = require("./prisma/prisma.module");
+const auth_module_1 = require("./auth/auth.module");
+const saved_posts_module_1 = require("./saved-posts/saved-posts.module");
+const room_views_module_1 = require("./room-views/room-views.module");
+const reviews_module_1 = require("./reviews/reviews.module");
+const chat_module_1 = require("./chat/chat.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -21,11 +27,17 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             config_1.ConfigModule.forRoot({ isGlobal: true }),
+            prisma_module_1.PrismaModule,
+            auth_module_1.AuthModule,
             database_module_1.DatabaseModule,
             provinces_module_1.ProvincesModule,
             districts_module_1.DistrictsModule,
             rooms_module_1.RoomsModule,
             candlestick_module_1.CandlestickModule,
+            saved_posts_module_1.SavedPostsModule,
+            room_views_module_1.RoomViewsModule,
+            reviews_module_1.ReviewsModule,
+            chat_module_1.ChatModule,
         ],
     })
 ], AppModule);

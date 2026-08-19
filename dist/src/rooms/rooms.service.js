@@ -21,58 +21,87 @@ let RoomsService = class RoomsService {
         this.pool = pool;
     }
     async getRooms(filterDto) {
-        const { city, district, minPrice, maxPrice, minArea, maxArea } = filterDto;
-        let query = `SELECT * FROM rooms WHERE 1 = 1`;
+        const { city, district, minPrice, maxPrice, minArea, maxArea, userId } = filterDto;
+        let query = `
+      SELECT 
+        r.*, 
+        p.name AS city_name, 
+        d.name AS district_name 
+      FROM rooms r
+      LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
+      LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
+      WHERE 1 = 1
+    `;
         const values = [];
         let index = 1;
-        if (city) {
-            query += ` AND city = $${index++}`;
-            values.push(city);
+        if (userId) {
+            query += ` AND r.user_id = $${index++}`;
+            values.push(Number(userId));
         }
-        if (district) {
-            query += ` AND district = $${index++}`;
-            values.push(district);
+        if (city && city !== 'undefined' && city !== '') {
+            const cityClean = String(city).trim();
+            const cityPadded = cityClean.padStart(2, '0');
+            query += ` AND (TRIM(r.city) = $${index} OR TRIM(r.city) = $${index + 1})`;
+            values.push(cityClean, cityPadded);
+            index += 2;
         }
-        if (minPrice !== undefined && minPrice !== '') {
-            query += ` AND price >= $${index++}`;
+        if (district && district !== 'undefined' && district !== '') {
+            const distClean = String(district).trim();
+            query += ` AND TRIM(r.district) = $${index++}`;
+            values.push(distClean);
+        }
+        if (minPrice !== undefined && minPrice !== '' && !isNaN(Number(minPrice))) {
+            query += ` AND r.price >= $${index++}`;
             values.push(Number(minPrice));
         }
-        if (maxPrice !== undefined && maxPrice !== '') {
-            query += ` AND price <= $${index++}`;
+        if (maxPrice !== undefined && maxPrice !== '' && !isNaN(Number(maxPrice))) {
+            query += ` AND r.price <= $${index++}`;
             values.push(Number(maxPrice));
         }
-        if (minArea !== undefined && minArea !== '') {
-            query += ` AND area >= $${index++}`;
+        if (minArea !== undefined && minArea !== '' && !isNaN(Number(minArea))) {
+            query += ` AND r.area >= $${index++}`;
             values.push(Number(minArea));
         }
-        if (maxArea !== undefined && maxArea !== '') {
-            query += ` AND area <= $${index++}`;
+        if (maxArea !== undefined && maxArea !== '' && !isNaN(Number(maxArea))) {
+            query += ` AND r.area <= $${index++}`;
             values.push(Number(maxArea));
         }
-        query += ` ORDER BY id DESC`;
-        const result = await this.pool.query(query, values);
-        return {
-            total: result.rows.length,
-            data: result.rows,
-        };
+        query += ` ORDER BY r.id DESC`;
+        try {
+            const result = await this.pool.query(query, values);
+            return {
+                total: result.rows.length,
+                data: result.rows,
+            };
+        }
+        catch (error) {
+            console.error('❌ [SQL ERROR]:', error);
+            throw error;
+        }
     }
     async getRoomById(id) {
-        const result = await this.pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]);
+        const result = await this.pool.query(`
+      SELECT r.*, p.name AS city_name, d.name AS district_name 
+      FROM rooms r
+      LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
+      LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
+      WHERE r.id = $1
+      `, [id]);
         if (result.rows.length === 0) {
             throw new common_1.NotFoundException('Không tìm thấy phòng');
         }
         return result.rows[0];
     }
-    async createRoom(dto) {
+    async createRoom(dto, userId) {
         const { title, thumbnail, price, area, city, district, content } = dto;
         if (!title || price === undefined || area === undefined || !city || !district) {
             throw new common_1.BadRequestException('Thiếu thông tin bắt buộc');
         }
         const result = await this.pool.query(`
-      INSERT INTO rooms (title, thumbnail, price, area, city, district, content)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO rooms (title, thumbnail, price, area, city, district, content, user_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
-      `, [title, thumbnail || null, price, area, city, district, content || null]);
+      `, [title, thumbnail || null, price, area, city, district, content || null, userId || null]);
         return result.rows[0];
     }
     async updateRoom(id, dto) {

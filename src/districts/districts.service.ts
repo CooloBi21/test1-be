@@ -28,16 +28,22 @@ export class DistrictsService {
 
   // Lọc Quận / Huyện theo parent_code từ Supabase
   async getDistrictsByProvince(parentCode: string): Promise<DistrictItem[]> {
-    // Tự động thêm số 0 ở đầu nếu truyền vào '1' -> biến thành '01' cho khớp DB
-    const formattedCode = String(parentCode).padStart(2, '0');
+    if (!parentCode || parentCode === 'undefined') return [];
+
+    const rawCode = String(parentCode).trim();
+    const paddedCode = rawCode.padStart(2, '0');
+
+    // Tìm kiếm cả hai định dạng ('1' và '01') để đảm bảo luôn khớp dữ liệu Supabase
+    const possibleCodes = Array.from(new Set([rawCode, paddedCode]));
 
     const { data, error } = await this.db.supabase
       .from('districts')
       .select('*')
-      .eq('parent_code', formattedCode);
+      .in('parent_code', possibleCodes)
+      .order('name', { ascending: true });
 
     if (error) {
-      console.error(`Lỗi truy vấn parent_code=${formattedCode}:`, error);
+      console.error(`Lỗi truy vấn parent_code=${parentCode}:`, error);
       throw error;
     }
 

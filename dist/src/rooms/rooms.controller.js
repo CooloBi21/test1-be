@@ -18,6 +18,7 @@ const swagger_1 = require("@nestjs/swagger");
 const rooms_service_1 = require("./rooms.service");
 const get_rooms_filter_dto_1 = require("./dto/get-rooms-filter.dto");
 const create_room_dto_1 = require("./dto/create-room.dto");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 let RoomsController = class RoomsController {
     constructor(roomsService) {
         this.roomsService = roomsService;
@@ -25,11 +26,22 @@ let RoomsController = class RoomsController {
     getRooms(filterDto) {
         return this.roomsService.getRooms(filterDto);
     }
+    getMyRooms(req) {
+        const userId = req.user?.id || req.user?.userId;
+        if (!userId) {
+            throw new common_1.UnauthorizedException('Không tìm thấy thông tin xác thực');
+        }
+        return this.roomsService.getRooms({ userId: Number(userId) });
+    }
     getRoomById(id) {
         return this.roomsService.getRoomById(id);
     }
-    createRoom(dto) {
-        return this.roomsService.createRoom(dto);
+    createRoom(dto, req) {
+        const userId = req.user?.id || req.user?.userId;
+        if (!userId) {
+            throw new common_1.UnauthorizedException('Không thể xác thực thông tin người dùng');
+        }
+        return this.roomsService.createRoom(dto, Number(userId));
     }
     updateRoom(id, dto) {
         return this.roomsService.updateRoom(id, dto);
@@ -48,6 +60,16 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "getRooms", null);
 __decorate([
+    (0, common_1.Get)('my-rooms'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Lấy danh sách bài đăng của tôi' }),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], RoomsController.prototype, "getMyRooms", null);
+__decorate([
     (0, common_1.Get)(':id'),
     (0, swagger_1.ApiOperation)({ summary: 'Lấy thông tin chi tiết 1 phòng trọ' }),
     __param(0, (0, common_1.Param)('id')),
@@ -57,14 +79,19 @@ __decorate([
 ], RoomsController.prototype, "getRoomById", null);
 __decorate([
     (0, common_1.Post)(),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Tạo phòng trọ mới' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_room_dto_1.CreateRoomDto]),
+    __metadata("design:paramtypes", [create_room_dto_1.CreateRoomDto, Object]),
     __metadata("design:returntype", void 0)
 ], RoomsController.prototype, "createRoom", null);
 __decorate([
     (0, common_1.Put)(':id'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Cập nhật thông tin phòng trọ' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -74,6 +101,8 @@ __decorate([
 ], RoomsController.prototype, "updateRoom", null);
 __decorate([
     (0, common_1.Delete)(':id'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Xóa phòng trọ' }),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),

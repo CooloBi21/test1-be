@@ -1,12 +1,24 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ValidationPipe } from '@nestjs/common'; // 1. Import ValidationPipe
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Bật CORS
-  app.enableCors();
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
+
+  // 2. Thêm ValidationPipe toàn cục
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // Loại bỏ các trường dữ liệu thừa không có trong DTO
+      transform: true, // Tự động convert kiểu dữ liệu phù hợp
+    }),
+  );
 
   // Cấu hình Swagger
   const config = new DocumentBuilder()

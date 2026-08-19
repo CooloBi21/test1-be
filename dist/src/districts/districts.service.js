@@ -27,13 +27,18 @@ let DistrictsService = class DistrictsService {
         return data || [];
     }
     async getDistrictsByProvince(parentCode) {
-        const formattedCode = String(parentCode).padStart(2, '0');
+        if (!parentCode || parentCode === 'undefined')
+            return [];
+        const rawCode = String(parentCode).trim();
+        const paddedCode = rawCode.padStart(2, '0');
+        const possibleCodes = Array.from(new Set([rawCode, paddedCode]));
         const { data, error } = await this.db.supabase
             .from('districts')
             .select('*')
-            .eq('parent_code', formattedCode);
+            .in('parent_code', possibleCodes)
+            .order('name', { ascending: true });
         if (error) {
-            console.error(`Lỗi truy vấn parent_code=${formattedCode}:`, error);
+            console.error(`Lỗi truy vấn parent_code=${parentCode}:`, error);
             throw error;
         }
         return data || [];

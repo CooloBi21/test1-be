@@ -11,31 +11,46 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GetRoomsFilterDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
+const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 class GetRoomsFilterDto {
 }
 exports.GetRoomsFilterDto = GetRoomsFilterDto;
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'ID người đăng bài' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], GetRoomsFilterDto.prototype, "userId", void 0);
+__decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'Mã tỉnh thành' }),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], GetRoomsFilterDto.prototype, "city", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'Mã quận huyện' }),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], GetRoomsFilterDto.prototype, "district", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'Giá tối thiểu (VNĐ)' }),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], GetRoomsFilterDto.prototype, "minPrice", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'Giá tối đa (VNĐ)' }),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], GetRoomsFilterDto.prototype, "maxPrice", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'Diện tích tối thiểu (m²)' }),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], GetRoomsFilterDto.prototype, "minArea", void 0);
 __decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: 'Diện tích tối đa (m²)' }),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], GetRoomsFilterDto.prototype, "maxArea", void 0);
 //# sourceMappingURL=get-rooms-filter.dto.js.map
