@@ -2,11 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import * as dns from 'dns';
 
-// Render (và nhiều host cloud khác) không có route IPv6 ổn định ra ngoài.
-// Từ Node 18+, dns.lookup() có thể trả về địa chỉ IPv6 trước (happy eyeballs),
-// khiến kết nối SMTP bị ENETUNREACH dù smtp.gmail.com vẫn hoạt động bình thường
-// qua IPv4. Ép thứ tự resolve ưu tiên IPv4 toàn cục — không hardcode IP của Google
-// vì dải IP đó xoay vòng liên tục, hardcode sẽ gãy lại sau một thời gian.
 dns.setDefaultResultOrder('ipv4first');
 
 @Injectable()
@@ -17,17 +12,19 @@ export class MailService {
     host: 'smtp.gmail.com',
     port: 465,
     secure: true,
+    family: 4, // Ép net.connect() chỉ dùng IPv4, tắt hoàn toàn Happy Eyeballs
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      user: process.env.GMAIL_USER?.trim(),
+      pass: process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, ''),
     },
-  });
+  } as nodemailer.TransportOptions);
 
   async sendVerificationEmail(email: string, token: string) {
-    const url = `${process.env.FRONTEND_URL}/verify?token=${token}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const url = `${frontendUrl}/verify?token=${token}`;
 
     try {
-      await this.transporter.sendMail({
+      const info = await this.transporter.sendMail({
         from: `"PhongTro247" <${process.env.GMAIL_USER}>`,
         to: email,
         subject: 'Xác nhận địa chỉ email của bạn',
@@ -37,9 +34,9 @@ export class MailService {
           <a href="${url}" target="_blank" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px;">Kích hoạt tài khoản ngay</a>
         `,
       });
+      this.logger.log(`Email sent successfully to ${email}: ${info.messageId}`);
     } catch (err) {
       this.logger.error(`Failed to send email to ${email}:`, err);
-      throw err;
     }
   }
 }
