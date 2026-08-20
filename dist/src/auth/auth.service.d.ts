@@ -1,10 +1,12 @@
-import { PrismaService } from '../prisma/prisma.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
 import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service';
+import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { MailService } from './mail.service';
 export declare class AuthService {
     private prisma;
     private jwtService;
-    constructor(prisma: PrismaService, jwtService: JwtService);
+    private mailService;
+    constructor(prisma: PrismaService, jwtService: JwtService, mailService: MailService);
     register(dto: RegisterDto): Promise<{
         message: string;
         user: {
@@ -15,6 +17,7 @@ export declare class AuthService {
             phone: string | null;
             avatar: string | null;
             role: string | null;
+            is_active: boolean;
         };
     }>;
     login(dto: LoginDto): Promise<{
@@ -28,6 +31,10 @@ export declare class AuthService {
             phone: string | null;
             avatar: string | null;
             role: string | null;
+            is_active: boolean;
         };
+    }>;
+    verifyEmail(token: string): Promise<{
+        message: string;
     }>;
 }

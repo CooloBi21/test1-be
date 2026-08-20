@@ -17,6 +17,8 @@ export declare class JwtStrategy extends JwtStrategy_base {
         phone: string | null;
         avatar: string | null;
         role: string | null;
+        is_active: boolean;
+        verification_token: string | null;
     }>;
 }
 export {};

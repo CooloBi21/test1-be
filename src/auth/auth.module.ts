@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { JwtStrategy } from './jwt.strategy';
+
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { JwtStrategy } from './jwt.strategy';
+import { MailService } from './mail.service';
 
 @Module({
   imports: [
@@ -12,12 +14,23 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     JwtModule.registerAsync({
       useFactory: () => ({
         secret: process.env.JWT_SECRET || 'secretKey',
-        signOptions: { expiresIn: '7d' }, // Token có hiệu lực 7 ngày
+        signOptions: { expiresIn: '7d' },
       }),
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
-  exports: [AuthService, JwtAuthGuard, PassportModule, JwtModule],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    JwtAuthGuard,
+    MailService,
+  ],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    PassportModule,
+    JwtModule,
+    MailService,
+  ],
 })
 export class AuthModule {}

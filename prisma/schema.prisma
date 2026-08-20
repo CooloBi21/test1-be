@@ -61,6 +61,8 @@ model users {
   conversations_user2 conversations[] @relation("user2")
   messages            messages[]      @relation("sender")
   notifications       notifications[]
+  is_active          Boolean @default(false)
+  verification_token String? @db.VarChar(255)
 }
 
 model saved_posts {

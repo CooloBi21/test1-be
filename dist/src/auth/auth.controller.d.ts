@@ -1,7 +1,7 @@
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { LoginDto, RegisterDto } from './dto/auth.dto';
 export declare class AuthController {
-    private authService;
+    private readonly authService;
     constructor(authService: AuthService);
     register(dto: RegisterDto): Promise<{
         message: string;
@@ -13,6 +13,7 @@ export declare class AuthController {
             phone: string | null;
             avatar: string | null;
             role: string | null;
+            is_active: boolean;
         };
     }>;
     login(dto: LoginDto): Promise<{
@@ -26,7 +27,11 @@ export declare class AuthController {
             phone: string | null;
             avatar: string | null;
             role: string | null;
+            is_active: boolean;
         };
     }>;
     getProfile(req: any): any;
+    verifyEmail(token: string): Promise<{
+        message: string;
+    }>;
 }

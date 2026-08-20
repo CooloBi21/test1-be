@@ -44,13 +44,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
-const prisma_service_1 = require("../prisma/prisma.service");
-const bcrypt = __importStar(require("bcrypt"));
 const jwt_1 = require("@nestjs/jwt");
+const bcrypt = __importStar(require("bcrypt"));
+const crypto = __importStar(require("crypto"));
+const prisma_service_1 = require("../prisma/prisma.service");
+const mail_service_1 = require("./mail.service");
 let AuthService = class AuthService {
-    constructor(prisma, jwtService) {
+    constructor(prisma, jwtService, mailService) {
         this.prisma = prisma;
         this.jwtService = jwtService;
+        this.mailService = mailService;
     }
     async register(dto) {
         const existingUser = await this.prisma.users.findUnique({
@@ -60,6 +63,7 @@ let AuthService = class AuthService {
             throw new common_1.BadRequestException('Email này đã được sử dụng!');
         }
         const hashedPassword = await bcrypt.hash(dto.password, 10);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
         const user = await this.prisma.users.create({
             data: {
                 full_name: dto.full_name,
@@ -67,10 +71,18 @@ let AuthService = class AuthService {
                 password: hashedPassword,
                 phone: dto.phone,
                 role: 'renter',
+                is_active: false,
+                verification_token: verificationToken,
             },
         });
-        const { password, ...result } = user;
-        return { message: 'Đăng ký thành công', user: result };
+        this.mailService
+            .sendVerificationEmail(user.email, verificationToken)
+            .catch((err) => console.error('Lỗi khi gửi email kích hoạt:', err));
+        const { password, verification_token, ...result } = user;
+        return {
+            message: 'Đăng ký thành công. Vui lòng kiểm tra email để kích hoạt tài khoản!',
+            user: result,
+        };
     }
     async login(dto) {
         const user = await this.prisma.users.findUnique({
@@ -79,24 +91,44 @@ let AuthService = class AuthService {
         if (!user) {
             throw new common_1.UnauthorizedException('Email hoặc mật khẩu không chính xác!');
         }
+        if (!user.is_active) {
+            throw new common_1.UnauthorizedException('Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email của bạn!');
+        }
         const isPasswordValid = await bcrypt.compare(dto.password, user.password);
         if (!isPasswordValid) {
             throw new common_1.UnauthorizedException('Email hoặc mật khẩu không chính xác!');
         }
         const payload = { sub: user.id, email: user.email, role: user.role };
         const accessToken = this.jwtService.sign(payload);
-        const { password, ...userInfo } = user;
+        const { password, verification_token, ...userInfo } = user;
         return {
             message: 'Đăng nhập thành công',
             access_token: accessToken,
             user: userInfo,
         };
     }
+    async verifyEmail(token) {
+        const user = await this.prisma.users.findFirst({
+            where: { verification_token: token },
+        });
+        if (!user) {
+            throw new common_1.BadRequestException('Đường dẫn xác thực không hợp lệ hoặc đã hết hạn.');
+        }
+        await this.prisma.users.update({
+            where: { id: user.id },
+            data: {
+                is_active: true,
+                verification_token: null,
+            },
+        });
+        return { message: 'Xác thực email thành công! Bạn đã có thể đăng nhập.' };
+    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        jwt_1.JwtService])
+        jwt_1.JwtService,
+        mail_service_1.MailService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

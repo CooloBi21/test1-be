@@ -7,9 +7,9 @@ export declare class ChatController {
             is_read: boolean;
             created_at: Date | null;
             id: number;
+            text: string;
             conversation_id: number;
             sender_id: number;
-            text: string;
         }[];
         room: {
             title: string;
@@ -45,9 +45,9 @@ export declare class ChatController {
         is_read: boolean;
         created_at: Date | null;
         id: number;
+        text: string;
         conversation_id: number;
         sender_id: number;
-        text: string;
     })[]>;
     createOrGetConversation(body: {
         targetUserId: number;
