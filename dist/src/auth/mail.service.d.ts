@@ -1,4 +1,6 @@
 export declare class MailService {
+    private readonly logger;
     private transporter;
-    sendVerificationEmail(email: string, token: string): Promise<void>;
+    constructor();
+    sendVerificationEmail(email: string, token: string): Promise<any>;
 }
