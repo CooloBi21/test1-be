@@ -13,15 +13,24 @@ export const DATABASE_POOL = 'DATABASE_POOL';
     {
       provide: DATABASE_POOL,
       useFactory: () => {
+        if (process.env.DATABASE_URL) {
+          return new Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false },
+          });
+        }
+
         return new Pool({
-          connectionString: process.env.DATABASE_URL,
-          ssl: {
-            rejectUnauthorized: false,
-          },
+          host: process.env.DB_HOST,
+          port: Number(process.env.DB_PORT) || 5432,
+          user: process.env.DB_USER,
+          password: process.env.DB_PASSWORD,
+          database: process.env.DB_NAME,
+          ssl: { rejectUnauthorized: false },
         });
       },
     },
   ],
-  exports: [DatabaseService, DATABASE_POOL], 
+  exports: [DatabaseService, DATABASE_POOL],
 })
 export class DatabaseModule {}

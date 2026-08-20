@@ -24,11 +24,19 @@ exports.DatabaseModule = DatabaseModule = __decorate([
             {
                 provide: exports.DATABASE_POOL,
                 useFactory: () => {
+                    if (process.env.DATABASE_URL) {
+                        return new pg_1.Pool({
+                            connectionString: process.env.DATABASE_URL,
+                            ssl: { rejectUnauthorized: false },
+                        });
+                    }
                     return new pg_1.Pool({
-                        connectionString: process.env.DATABASE_URL,
-                        ssl: {
-                            rejectUnauthorized: false,
-                        },
+                        host: process.env.DB_HOST,
+                        port: Number(process.env.DB_PORT) || 5432,
+                        user: process.env.DB_USER,
+                        password: process.env.DB_PASSWORD,
+                        database: process.env.DB_NAME,
+                        ssl: { rejectUnauthorized: false },
                     });
                 },
             },
