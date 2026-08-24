@@ -16,8 +16,8 @@ exports.RoomsService = void 0;
 const common_1 = require("@nestjs/common");
 const pg_1 = require("pg");
 const database_module_1 = require("../database/database.module");
-const prisma_service_1 = require("../prisma/prisma.service");
 const notifications_service_1 = require("../notifications/notifications.service");
+const prisma_service_1 = require("../prisma/prisma.service");
 let RoomsService = class RoomsService {
     constructor(pool, prisma, notificationsService) {
         this.pool = pool;
@@ -41,6 +41,9 @@ let RoomsService = class RoomsService {
         if (userId) {
             query += ` AND r.user_id = $${index++}`;
             values.push(Number(userId));
+        }
+        else {
+            query += ` AND r.status = 'approved'`;
         }
         if (city && city !== 'undefined' && city !== '') {
             const cityClean = String(city).trim();
@@ -98,14 +101,27 @@ let RoomsService = class RoomsService {
     }
     async createRoom(dto, userId) {
         const { title, thumbnail, price, area, city, district, content } = dto;
-        if (!title || price === undefined || area === undefined || !city || !district) {
+        if (!title ||
+            price === undefined ||
+            area === undefined ||
+            !city ||
+            !district) {
             throw new common_1.BadRequestException('Thiếu thông tin bắt buộc');
         }
         const result = await this.pool.query(`
-      INSERT INTO rooms (title, thumbnail, price, area, city, district, content, user_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO rooms (title, thumbnail, price, area, city, district, content, user_id, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
       RETURNING *
-      `, [title, thumbnail || null, price, area, city, district, content || null, userId || null]);
+      `, [
+            title,
+            thumbnail || null,
+            price,
+            area,
+            city,
+            district,
+            content || null,
+            userId || null,
+        ]);
         return result.rows[0];
     }
     async updateRoom(id, dto, currentUserId) {
@@ -118,7 +134,15 @@ let RoomsService = class RoomsService {
             throw new common_1.ForbiddenException('Bạn không có quyền chỉnh sửa bài đăng này');
         }
         const changes = [];
-        const fieldsToCompare = ['price', 'title', 'thumbnail', 'area', 'city', 'district', 'content'];
+        const fieldsToCompare = [
+            'price',
+            'title',
+            'thumbnail',
+            'area',
+            'city',
+            'district',
+            'content',
+        ];
         const fieldNamesVN = {
             price: 'giá thuê',
             title: 'tiêu đề',
@@ -132,8 +156,12 @@ let RoomsService = class RoomsService {
             if (dto[field] !== undefined) {
                 let isChanged = false;
                 if (field === 'price' || field === 'area') {
-                    const oldNum = oldRoom[field] !== null && oldRoom[field] !== undefined ? Number(oldRoom[field]) : 0;
-                    const newNum = dto[field] !== null && dto[field] !== undefined ? Number(dto[field]) : 0;
+                    const oldNum = oldRoom[field] !== null && oldRoom[field] !== undefined
+                        ? Number(oldRoom[field])
+                        : 0;
+                    const newNum = dto[field] !== null && dto[field] !== undefined
+                        ? Number(dto[field])
+                        : 0;
                     if (oldNum !== newNum) {
                         isChanged = true;
                     }
@@ -157,19 +185,33 @@ let RoomsService = class RoomsService {
         if (changes.length === 0) {
             return { data: oldRoom, changes: [] };
         }
-        const { title, thumbnail, price, area, city, district, content } = { ...oldRoom, ...dto };
+        const { title, thumbnail, price, area, city, district, content } = {
+            ...oldRoom,
+            ...dto,
+        };
         const result = await this.pool.query(`
       UPDATE rooms
       SET title = $1, thumbnail = $2, price = $3, area = $4, city = $5, district = $6, content = $7
       WHERE id = $8
       RETURNING *
-      `, [title, thumbnail || null, price, area, city, district, content || null, id]);
+      `, [
+            title,
+            thumbnail || null,
+            price,
+            area,
+            city,
+            district,
+            content || null,
+            id,
+        ]);
         const updatedRoom = result.rows[0];
         const savedUsers = await this.prisma.saved_posts.findMany({
             where: { room_id: Number(id) },
             select: { user_id: true },
         });
-        const changedFieldNames = changes.map((c) => fieldNamesVN[c.field] || c.field).join(', ');
+        const changedFieldNames = changes
+            .map((c) => fieldNamesVN[c.field] || c.field)
+            .join(', ');
         const priceChange = changes.find((c) => c.field === 'price');
         let notiTitle = `Phòng đã lưu thay đổi ${changedFieldNames}`;
         let notiBody = `Phòng "${updatedRoom.title}" vừa cập nhật: ${changedFieldNames}.`;
@@ -191,6 +233,24 @@ let RoomsService = class RoomsService {
             }
         }
         return { data: updatedRoom, changes };
+    }
+    async updateRoomStatus(id, status) {
+        try {
+            const updatedRoom = await this.prisma.rooms.update({
+                where: { id: Number(id) },
+                data: { status: status },
+            });
+            return {
+                message: `Đã cập nhật trạng thái phòng thành ${status}`,
+                room: updatedRoom,
+            };
+        }
+        catch (error) {
+            if (error?.code === 'P2025') {
+                throw new common_1.NotFoundException('Không tìm thấy phòng với ID này!');
+            }
+            throw error;
+        }
     }
     async deleteRoom(id, currentUserId) {
         const roomCheck = await this.pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]);

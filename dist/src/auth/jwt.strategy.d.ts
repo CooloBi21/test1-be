@@ -16,9 +16,11 @@ export declare class JwtStrategy extends JwtStrategy_base {
         email: string;
         phone: string | null;
         avatar: string | null;
-        role: string | null;
+        role: import(".prisma/client").$Enums.Role | null;
         is_active: boolean;
         verification_token: string | null;
+        is_banned: boolean;
+        ban_reason: string | null;
     }>;
 }
 export {};

@@ -47,6 +47,7 @@ const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = __importStar(require("bcrypt"));
 const crypto = __importStar(require("crypto"));
+const google_auth_library_1 = require("google-auth-library");
 const prisma_service_1 = require("../prisma/prisma.service");
 const mail_service_1 = require("./mail.service");
 let AuthService = class AuthService {
@@ -54,6 +55,7 @@ let AuthService = class AuthService {
         this.prisma = prisma;
         this.jwtService = jwtService;
         this.mailService = mailService;
+        this.googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     }
     async register(dto) {
         const existingUser = await this.prisma.users.findUnique({
@@ -91,6 +93,13 @@ let AuthService = class AuthService {
         if (!user) {
             throw new common_1.UnauthorizedException('Email hoặc mật khẩu không chính xác!');
         }
+        if (user.is_banned) {
+            throw new common_1.ForbiddenException({
+                message: 'Tài khoản của bạn đã bị khóa.',
+                reason: user.ban_reason || 'Vi phạm điều khoản dịch vụ',
+                banned: true,
+            });
+        }
         if (!user.is_active) {
             throw new common_1.UnauthorizedException('Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email của bạn!');
         }
@@ -107,6 +116,55 @@ let AuthService = class AuthService {
             user: userInfo,
         };
     }
+    async googleLogin(idToken) {
+        try {
+            const ticket = await this.googleClient.verifyIdToken({
+                idToken,
+                audience: process.env.GOOGLE_CLIENT_ID,
+            });
+            const payload = ticket.getPayload();
+            if (!payload || !payload.email) {
+                throw new common_1.UnauthorizedException('Token Google không hợp lệ!');
+            }
+            const { email, name, picture } = payload;
+            let user = await this.prisma.users.findUnique({
+                where: { email },
+            });
+            if (!user) {
+                user = await this.prisma.users.create({
+                    data: {
+                        email,
+                        full_name: name || 'Google User',
+                        avatar: picture || null,
+                        role: 'renter',
+                        is_active: true,
+                        password: '',
+                    },
+                });
+            }
+            if (user.is_banned) {
+                throw new common_1.ForbiddenException({
+                    message: 'Tài khoản của bạn đã bị khóa.',
+                    reason: user.ban_reason || 'Vi phạm điều khoản dịch vụ',
+                    banned: true,
+                });
+            }
+            const jwtPayload = { sub: user.id, email: user.email, role: user.role };
+            const accessToken = this.jwtService.sign(jwtPayload);
+            const { password, verification_token, ...userInfo } = user;
+            return {
+                message: 'Đăng nhập Google thành công',
+                access_token: accessToken,
+                user: userInfo,
+            };
+        }
+        catch (error) {
+            if (error instanceof common_1.ForbiddenException) {
+                throw error;
+            }
+            throw new common_1.UnauthorizedException('Xác thực Google thất bại!');
+        }
+    }
     async verifyEmail(token) {
         const user = await this.prisma.users.findFirst({
             where: { verification_token: token },
@@ -122,6 +180,49 @@ let AuthService = class AuthService {
             },
         });
         return { message: 'Xác thực email thành công! Bạn đã có thể đăng nhập.' };
+    }
+    async forgotPassword(email) {
+        const user = await this.prisma.users.findUnique({ where: { email } });
+        if (!user) {
+            return {
+                message: 'Nếu email tồn tại trong hệ thống, mật khẩu mới sẽ được gửi.',
+            };
+        }
+        const tempPasswordHex = crypto.randomBytes(4).toString('hex');
+        const hashedPassword = await bcrypt.hash(tempPasswordHex, 10);
+        await this.prisma.users.update({
+            where: { id: user.id },
+            data: { password: hashedPassword },
+        });
+        await this.mailService.sendForgotPasswordEmail(email, tempPasswordHex);
+        return { message: 'Mật khẩu tạm thời đã được gửi vào email của bạn.' };
+    }
+    async changePassword(userId, currentPass, newPass) {
+        const user = await this.prisma.users.findUnique({ where: { id: userId } });
+        if (!user)
+            throw new common_1.NotFoundException('Không tìm thấy người dùng');
+        if (!user.password) {
+            throw new common_1.BadRequestException('Tài khoản này đăng nhập bằng Google. Không thể đổi mật khẩu theo cách này.');
+        }
+        const isMatch = await bcrypt.compare(currentPass, user.password);
+        if (!isMatch) {
+            throw new common_1.BadRequestException('Mật khẩu hiện tại không chính xác');
+        }
+        const hashedNewPassword = await bcrypt.hash(newPass, 10);
+        await this.prisma.users.update({
+            where: { id: userId },
+            data: { password: hashedNewPassword },
+        });
+        await this.mailService.sendPasswordChangedSuccessEmail(user.email);
+        return { message: 'Đổi mật khẩu thành công' };
+    }
+    async updateProfile(userId, fullName, phone) {
+        const updatedUser = await this.prisma.users.update({
+            where: { id: userId },
+            data: { full_name: fullName, phone },
+        });
+        const { password, verification_token, ...result } = updatedUser;
+        return result;
     }
 };
 exports.AuthService = AuthService;

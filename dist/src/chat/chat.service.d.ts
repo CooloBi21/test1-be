@@ -7,9 +7,9 @@ export declare class ChatService {
             is_read: boolean;
             created_at: Date | null;
             id: number;
-            text: string;
             conversation_id: number;
             sender_id: number;
+            text: string;
         }[];
         room: {
             title: string;
@@ -45,9 +45,9 @@ export declare class ChatService {
         is_read: boolean;
         created_at: Date | null;
         id: number;
-        text: string;
         conversation_id: number;
         sender_id: number;
+        text: string;
     })[]>;
     createOrGetConversation(user1Id: number, user2Id: number, roomId?: number): Promise<{
         created_at: Date | null;
@@ -67,9 +67,9 @@ export declare class ChatService {
         is_read: boolean;
         created_at: Date | null;
         id: number;
-        text: string;
         conversation_id: number;
         sender_id: number;
+        text: string;
     }>;
     markAsRead(conversationId: number, userId: number): Promise<{
         success: boolean;

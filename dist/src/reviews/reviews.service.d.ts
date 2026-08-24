@@ -13,11 +13,12 @@ export declare class ReviewsService {
             title: string;
             id: number;
             user_id: number | null;
-            city: string;
-            district: string;
             thumbnail: string | null;
             price: import("@prisma/client/runtime/library").Decimal;
             area: import("@prisma/client/runtime/library").Decimal;
+            city: string;
+            district: string;
+            status: import(".prisma/client").$Enums.RoomStatus | null;
         };
     } & {
         created_at: Date | null;
@@ -34,11 +35,12 @@ export declare class ReviewsService {
             title: string;
             id: number;
             user_id: number | null;
-            city: string;
-            district: string;
             thumbnail: string | null;
             price: import("@prisma/client/runtime/library").Decimal;
             area: import("@prisma/client/runtime/library").Decimal;
+            city: string;
+            district: string;
+            status: import(".prisma/client").$Enums.RoomStatus | null;
         };
     } & {
         created_at: Date | null;
@@ -59,11 +61,12 @@ export declare class ReviewsService {
             title: string;
             id: number;
             user_id: number | null;
-            city: string;
-            district: string;
             thumbnail: string | null;
             price: import("@prisma/client/runtime/library").Decimal;
             area: import("@prisma/client/runtime/library").Decimal;
+            city: string;
+            district: string;
+            status: import(".prisma/client").$Enums.RoomStatus | null;
         };
     } & {
         created_at: Date | null;

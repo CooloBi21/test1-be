@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const passport_1 = require("@nestjs/passport");
 const auth_service_1 = require("./auth.service");
 const auth_dto_1 = require("./dto/auth.dto");
+const google_login_dto_1 = require("./dto/google-login.dto");
 let AuthController = class AuthController {
     constructor(authService) {
         this.authService = authService;
@@ -27,11 +28,23 @@ let AuthController = class AuthController {
     login(dto) {
         return this.authService.login(dto);
     }
+    googleLogin(dto) {
+        return this.authService.googleLogin(dto.token);
+    }
     getProfile(req) {
         return req.user;
     }
+    updateProfile(req, dto) {
+        return this.authService.updateProfile(req.user.id, dto.full_name, dto.phone);
+    }
     verifyEmail(token) {
         return this.authService.verifyEmail(token);
+    }
+    forgotPassword(dto) {
+        return this.authService.forgotPassword(dto.email);
+    }
+    changePassword(req, dto) {
+        return this.authService.changePassword(req.user.id, dto.current_password, dto.new_password);
     }
 };
 exports.AuthController = AuthController;
@@ -50,6 +63,13 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "login", null);
 __decorate([
+    (0, common_1.Post)('google'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [google_login_dto_1.GoogleLoginDto]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "googleLogin", null);
+__decorate([
     (0, common_1.UseGuards)((0, passport_1.AuthGuard)('jwt')),
     (0, common_1.Get)('profile'),
     __param(0, (0, common_1.Request)()),
@@ -58,12 +78,37 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "getProfile", null);
 __decorate([
+    (0, common_1.UseGuards)((0, passport_1.AuthGuard)('jwt')),
+    (0, common_1.Put)('profile'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, auth_dto_1.UpdateProfileDto]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "updateProfile", null);
+__decorate([
     (0, common_1.Get)('verify'),
     __param(0, (0, common_1.Query)('token')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "verifyEmail", null);
+__decorate([
+    (0, common_1.Post)('forgot-password'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [auth_dto_1.ForgotPasswordDto]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "forgotPassword", null);
+__decorate([
+    (0, common_1.UseGuards)((0, passport_1.AuthGuard)('jwt')),
+    (0, common_1.Post)('change-password'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, auth_dto_1.ChangePasswordDto]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "changePassword", null);
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('auth'),
     __metadata("design:paramtypes", [auth_service_1.AuthService])

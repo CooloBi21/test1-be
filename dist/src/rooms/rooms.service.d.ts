@@ -1,8 +1,8 @@
 import { Pool } from 'pg';
-import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { GetRoomsFilterDto } from './dto/get-rooms-filter.dto';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { GetRoomsFilterDto } from './dto/get-rooms-filter.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 export declare class RoomsService {
     private readonly pool;
@@ -24,6 +24,21 @@ export declare class RoomsService {
             oldValue: any;
             newValue: any;
         }[];
+    }>;
+    updateRoomStatus(id: number, status: 'approved' | 'rejected'): Promise<{
+        message: string;
+        room: {
+            content: string | null;
+            title: string;
+            id: number;
+            user_id: number | null;
+            thumbnail: string | null;
+            price: import("@prisma/client/runtime/library").Decimal;
+            area: import("@prisma/client/runtime/library").Decimal;
+            city: string;
+            district: string;
+            status: import(".prisma/client").$Enums.RoomStatus | null;
+        };
     }>;
     deleteRoom(id: string, currentUserId: number): Promise<{
         message: string;

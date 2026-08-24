@@ -12,6 +12,9 @@ import { RoomViewsModule } from './room-views/room-views.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ReportsModule } from './reports/reports.module';
+import { AdminUsersModule } from './admin-users/admin-users.module';
+import { SupportTicketsModule } from './support-tickets/support-tickets.module';
 
 @Module({
   imports: [
@@ -28,6 +31,9 @@ import { NotificationsModule } from './notifications/notifications.module';
     ReviewsModule,
     ChatModule,
     NotificationsModule,
+    ReportsModule,
+    AdminUsersModule,
+    SupportTicketsModule,
   ],
 })
 export class AppModule {}

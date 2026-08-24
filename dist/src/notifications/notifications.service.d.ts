@@ -1,18 +1,19 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
+export interface CreateNotificationInput {
+    user_id: number;
+    type: string;
+    title: string;
+    body?: string;
+    target_url?: string;
+    entity_type?: string;
+    entity_id?: number;
+}
 export declare class NotificationsService {
     private readonly prisma;
     private readonly notificationsGateway;
     constructor(prisma: PrismaService, notificationsGateway: NotificationsGateway);
-    createNotification(data: {
-        user_id: number;
-        type: string;
-        title: string;
-        body?: string;
-        target_url?: string;
-        entity_type?: string;
-        entity_id?: number;
-    }): Promise<{
+    createNotification(data: CreateNotificationInput): Promise<{
         type: string;
         title: string;
         body: string | null;

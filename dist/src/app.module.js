@@ -21,6 +21,9 @@ const room_views_module_1 = require("./room-views/room-views.module");
 const reviews_module_1 = require("./reviews/reviews.module");
 const chat_module_1 = require("./chat/chat.module");
 const notifications_module_1 = require("./notifications/notifications.module");
+const reports_module_1 = require("./reports/reports.module");
+const admin_users_module_1 = require("./admin-users/admin-users.module");
+const support_tickets_module_1 = require("./support-tickets/support-tickets.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -40,6 +43,9 @@ exports.AppModule = AppModule = __decorate([
             reviews_module_1.ReviewsModule,
             chat_module_1.ChatModule,
             notifications_module_1.NotificationsModule,
+            reports_module_1.ReportsModule,
+            admin_users_module_1.AdminUsersModule,
+            support_tickets_module_1.SupportTicketsModule,
         ],
     })
 ], AppModule);

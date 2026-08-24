@@ -20,7 +20,15 @@ let NotificationsService = class NotificationsService {
     }
     async createNotification(data) {
         const notification = await this.prisma.notifications.create({
-            data,
+            data: {
+                user_id: data.user_id,
+                type: data.type,
+                title: data.title,
+                body: data.body,
+                target_url: data.target_url,
+                entity_type: data.entity_type,
+                entity_id: data.entity_id,
+            },
         });
         const unreadCount = await this.getUnreadCount(data.user_id);
         this.notificationsGateway.emitNewNotification(data.user_id, notification);

@@ -2,6 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
 
+export interface CreateNotificationInput {
+  user_id: number;
+  type: string;
+  title: string;
+  body?: string;
+  target_url?: string;
+  entity_type?: string;
+  entity_id?: number;
+}
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -9,24 +19,24 @@ export class NotificationsService {
     private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
-  async createNotification(data: {
-    user_id: number;
-    type: string;
-    title: string;
-    body?: string;
-    target_url?: string;
-    entity_type?: string;
-    entity_id?: number;
-  }) {
-    // 1. Lưu thông báo vào DB
+  async createNotification(data: CreateNotificationInput) {
+    // 1. Tạo 1 bản ghi duy nhất trong DB
     const notification = await this.prisma.notifications.create({
-      data,
+      data: {
+        user_id: data.user_id,
+        type: data.type,
+        title: data.title,
+        body: data.body,
+        target_url: data.target_url,
+        entity_type: data.entity_type,
+        entity_id: data.entity_id,
+      },
     });
 
-    // 2. Tính lại số lượng chưa đọc
+    // 2. Lấy lại số lượng chưa đọc mới nhất
     const unreadCount = await this.getUnreadCount(data.user_id);
 
-    // 3. Emit realtime qua Socket.IO
+    // 3. Emit realtime qua Socket.IO (Chỉ phát 1 lần cho client)
     this.notificationsGateway.emitNewNotification(data.user_id, notification);
     this.notificationsGateway.emitUnreadCount(data.user_id, unreadCount);
 
@@ -37,7 +47,7 @@ export class NotificationsService {
     return this.prisma.notifications.findMany({
       where: { user_id: userId },
       orderBy: { created_at: 'desc' },
-      take: 50, // Giới hạn lấy 50 thông báo gần nhất
+      take: 50,
     });
   }
 

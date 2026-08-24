@@ -24,45 +24,52 @@ model provinces {
 }
 
 model rooms {
-  id        Int          @id @default(autoincrement())
-  user_id   Int?         
-  title     String
-  thumbnail String?
-  price     Decimal      @db.Decimal(15, 2)
-  area      Decimal      @db.Decimal(10, 2)
-  city      String       @db.VarChar(20)
-  district  String       @db.VarChar(20)
-  content   String?
-  saved_by  saved_posts[]
-  viewed_by room_views[]
-  reviews   reviews[]    @relation("reviews")
+  id            Int             @id @default(autoincrement())
+  user_id       Int?          
+  title         String
+  thumbnail     String?
+  price         Decimal         @db.Decimal(15, 2)
+  area          Decimal         @db.Decimal(10, 2)
+  city          String          @db.VarChar(20)
+  district      String          @db.VarChar(20)
+  content       String?
+  saved_by      saved_posts[]
+  viewed_by     room_views[]
+  reviews       reviews[]       @relation("reviews")
   conversations conversations[]
+  reports       reports[]
+  status        RoomStatus?     @default(pending)
   
-  user      users?       @relation(fields: [user_id], references: [id], onDelete: SetNull)
-  districts districts    @relation(fields: [district], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "fk_room_district")
-  provinces provinces    @relation(fields: [city], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "fk_room_province")
+  user          users?          @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  districts     districts       @relation(fields: [district], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "fk_room_district")
+  provinces     provinces       @relation(fields: [city], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "fk_room_province")
 }
 
 model users {
-  id          Int          @id @default(autoincrement())
-  full_name   String       @db.VarChar(100)
-  email       String       @unique @db.VarChar(100)
-  password    String       @db.VarChar(255)
-  phone       String?      @db.VarChar(20)
-  avatar      String?      @db.VarChar(255)
-  role        String?      @default("renter") @db.VarChar(20)
-  created_at  DateTime?    @default(now()) @db.Timestamp(6)
+  id                  Int             @id @default(autoincrement())
+  full_name           String          @db.VarChar(100)
+  email               String          @unique @db.VarChar(100)
+  password            String          @db.VarChar(255)
+  phone               String?         @db.VarChar(20)
+  avatar              String?         @db.VarChar(255)
+  role                Role?           @default(renter)
+  created_at          DateTime?       @default(now()) @db.Timestamp(6)
   
-  rooms       rooms[]
-  saved_posts saved_posts[]
-  room_views  room_views[]
-  reviews     reviews[]    @relation("reviewer")
+  rooms               rooms[]
+  saved_posts         saved_posts[]
+  room_views          room_views[]
+  reviews             reviews[]       @relation("reviewer")
   conversations_user1 conversations[] @relation("user1")
   conversations_user2 conversations[] @relation("user2")
   messages            messages[]      @relation("sender")
   notifications       notifications[]
-  is_active          Boolean @default(false)
-  verification_token String? @db.VarChar(255)
+  reports             reports[]
+  is_active           Boolean         @default(false)
+  verification_token  String?         @db.VarChar(255)
+  is_banned           Boolean         @default(false)
+  ban_reason          String?         @db.Text
+
+  support_tickets support_tickets[]
 }
 
 model saved_posts {
@@ -111,16 +118,16 @@ model reviews {
 }
 
 model conversations {
-  id         Int        @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   room_id    Int?
   user_1_id  Int        // Người bắt đầu chat (Renter)
   user_2_id  Int        // Chủ nhà (Landlord)
-  created_at DateTime?  @default(now()) @db.Timestamp(6)
-  updated_at DateTime?  @updatedAt @db.Timestamp(6)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_at DateTime? @updatedAt @db.Timestamp(6)
 
-  room     rooms?     @relation(fields: [room_id], references: [id], onDelete: SetNull)
-  user1    users      @relation("user1", fields: [user_1_id], references: [id], onDelete: Cascade)
-  user2    users      @relation("user2", fields: [user_2_id], references: [id], onDelete: Cascade)
+  room     rooms?    @relation(fields: [room_id], references: [id], onDelete: SetNull)
+  user1    users     @relation("user1", fields: [user_1_id], references: [id], onDelete: Cascade)
+  user2    users     @relation("user2", fields: [user_2_id], references: [id], onDelete: Cascade)
   messages messages[]
 
   @@unique([user_1_id, user_2_id, room_id])
@@ -154,4 +161,62 @@ model notifications {
 
   @@index([user_id, is_read])
   @@index([created_at])
+}
+
+model reports {
+  id          Int      @id @default(autoincrement())
+  room_id     Int
+  reporter_id Int
+  reason      String   @db.Text
+  status      String   @default("pending") // 'pending' | 'resolved' | 'dismissed'
+  created_at  DateTime @default(now())
+
+  // Relations
+  room     rooms @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  reporter users @relation(fields: [reporter_id], references: [id], onDelete: Cascade)
+
+  @@index([room_id])
+  @@index([reporter_id])
+}
+
+model support_tickets {
+  id          Int            @id @default(autoincrement())
+  user_id     Int
+  category    TicketCategory
+  message     String         @db.Text
+  status      TicketStatus   @default(open)
+  admin_reply String?        @db.Text
+  created_at  DateTime       @default(now())
+  updated_at  DateTime       @updatedAt
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([status])
+}
+
+enum Role {
+  renter
+  landlord
+  admin
+}
+
+enum RoomStatus {
+  pending
+  approved
+  rejected
+}
+
+enum TicketCategory {
+  account_issue
+  room_issue
+  payment_issue
+  report_dispute
+  other
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  resolved
 }
