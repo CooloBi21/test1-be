@@ -13,8 +13,18 @@ export declare class RoomsController {
         total: number;
         data: any[];
     }>;
-    getRoomById(id: string): Promise<void>;
-    createRoom(dto: CreateRoomDto, req: any): any;
-    updateRoom(id: string, dto: UpdateRoomDto, req: any): any;
-    deleteRoom(id: string, req: any): any;
+    getRoomById(id: string): Promise<any>;
+    createRoom(dto: CreateRoomDto, req: any): Promise<any>;
+    updateRoom(id: string, dto: UpdateRoomDto, req: any): Promise<{
+        data: any;
+        changes: {
+            field: string;
+            oldValue: any;
+            newValue: any;
+        }[];
+    }>;
+    deleteRoom(id: string, req: any): Promise<{
+        message: string;
+        data: any;
+    }>;
 }

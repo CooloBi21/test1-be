@@ -6,4 +6,5 @@ export declare class CreateRoomDto {
     city: string;
     district: string;
     content?: string;
+    images?: string[];
 }

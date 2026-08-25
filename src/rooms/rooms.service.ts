@@ -1,127 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { Pool } from 'pg';
-import { DATABASE_POOL } from '../database/database.module';
-import { NotificationsService } from '../notifications/notifications.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateRoomDto } from './dto/create-room.dto';
-import { GetRoomsFilterDto } from './dto/get-rooms-filter.dto';
-import { UpdateRoomDto } from './dto/update-room.dto';
-
-@Injectable()
-export class RoomsService {
-  constructor(
-    @Inject(DATABASE_POOL) private readonly pool: Pool,
-    private readonly prisma: PrismaService,
-    private readonly notificationsService: NotificationsService,
-  ) {}
-
-  // 1. LẤY DANH SÁCH PHÒNG TRỌ (Hỗ trợ lọc & bài đăng của tôi)
-  async getRooms(filterDto: GetRoomsFilterDto & { userId?: number }) {
-    const { city, district, minPrice, maxPrice, minArea, maxArea, userId } =
-      filterDto;
-
-    let query = `
-      SELECT 
-        r.*, 
-        p.name AS city_name, 
-        d.name AS district_name 
-      FROM rooms r
-      LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
-      LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
-      WHERE 1 = 1
-    `;
-    const values: any[] = [];
-    let index = 1;
-
-    // Tách biệt quyền xem phòng: Chủ trọ xem tất cả phòng của họ, công khai chỉ hiển thị phòng đã duyệt 'approved'
-    if (userId) {
-      query += ` AND r.user_id = $${index++}`;
-      values.push(Number(userId));
-    } else {
-      query += ` AND r.status = 'approved'`;
-    }
-
-    if (city && city !== 'undefined' && city !== '') {
-      const cityClean = String(city).trim();
-      const cityPadded = cityClean.padStart(2, '0');
-      query += ` AND (TRIM(r.city) = $${index} OR TRIM(r.city) =$${index + 1})`;
-      values.push(cityClean, cityPadded);
-      index += 2;
-    }
-
-    if (district && district !== 'undefined' && district !== '') {
-      const distClean = String(district).trim();
-      query += ` AND TRIM(r.district) = $${index++}`;
-      values.push(distClean);
-    }
-
-    if (minPrice !== undefined && minPrice !== '' && !isNaN(Number(minPrice))) {
-      query += ` AND r.price >= $${index++}`;
-      values.push(Number(minPrice));
-    }
-    if (maxPrice !== undefined && maxPrice !== '' && !isNaN(Number(maxPrice))) {
-      query += ` AND r.price <= $${index++}`;
-      values.push(Number(maxPrice));
-    }
-
-    if (minArea !== undefined && minArea !== '' && !isNaN(Number(minArea))) {
-      query += ` AND r.area >= $${index++}`;
-      values.push(Number(minArea));
-    }
-    if (maxArea !== undefined && maxArea !== '' && !isNaN(Number(maxArea))) {
-      query += ` AND r.area <= $${index++}`;
-      values.push(Number(maxArea));
-    }
-
-    query += ` ORDER BY r.id DESC`;
-
-    try {
-      const result = await this.pool.query(query, values);
-      return {
-        total: result.rows.length,
-        data: result.rows,
-      };
-    } catch (error) {
-      console.error('❌ [SQL ERROR]:', error);
-      throw error;
-    }
-  }
-
-  // 2. LẤY CHI TIẾT 1 PHÒNG TRỌ (Đã JOIN kèm thông tin User/Owner)
-  async getRoomById(id: string) {
-    const result = await this.pool.query(
-      `
-      SELECT 
-        r.*, 
-        p.name AS city_name, 
-        d.name AS district_name,
-        CASE WHEN u.id IS NOT NULL THEN
-          json_build_object(
-            'id', u.id,
-            'full_name', u.full_name,
-            'phone', u.phone,
-            'avatar', u.avatar,
-            'is_verified', u.is_active
-          )
-        ELSE NULL END AS user
-      FROM rooms r
-      LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
-      LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
-      LEFT JOIN users u ON r.user_idChào bạn, nguyên nhân bạn đưa ra rất chính xác. Đoạn code mẫu bạn tham khảo đang viết bằng **TypeORM** (`this.roomRepository.create(...)`), tuy nhiên trong file `rooms.service.ts` thực tế của bạn, bạn lại đang sử dụng **Raw SQL** thông qua `pg Pool` (`this.pool.query(...)`).
-
-Vì vậy, mình đã sửa lại và chuyển đổi logic gán `images` cùng `thumbnail` vào thẳng câu lệnh `INSERT INTO` (trong hàm `createRoom`) và `UPDATE` (trong hàm `updateRoom`) để tương thích với cấu trúc code hiện tại của bạn.
-
-Dưới đây là file `rooms.service.ts` đã được hoàn thiện.
-
-### File `src/rooms/rooms.service.ts` hoàn chỉnh
-
-```typescript
+// src/rooms/rooms.service.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -287,8 +164,8 @@ export class RoomsService {
 
   // 3. TẠO PHÒNG TRỌ MỚI (Trạng thái mặc định là pending chờ duyệt)
   async createRoom(dto: CreateRoomDto, userId?: number) {
-    // ⚠️ Lấy thêm trường images từ Dto
-    const { title, thumbnail, price, area, city, district, content, images } = dto;
+    const { title, price, area, city, district, content, thumbnail, images } = dto;
+    
     if (
       !title ||
       price === undefined ||
@@ -299,30 +176,23 @@ export class RoomsService {
       throw new BadRequestException('Thiếu thông tin bắt buộc');
     }
 
-    // ⚠️ Xử lý thumbnail: Lấy ảnh đầu tiên trong mảng images nếu có, nếu không thì dùng thumbnail gửi lên
-    const finalThumbnail = (images && images.length > 0) ? images[0] : (thumbnail || null);
-    
-    // ⚠️ Xử lý mảng images (Lưu ý: Nếu db cột images của bạn là JSONB, hãy dùng JSON.stringify(images || []))
-    // Trong pg, truyền trực tiếp mảng JS sẽ được tự động convert thành Array của PostgreSQL.
-    const finalImages = images ? JSON.stringify(images) : '[]'; 
-
     const result = await this.pool.query(
       `
-      INSERT INTO rooms (title, thumbnail, price, area, city, district, content, user_id, status, images)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
+      INSERT INTO rooms (title, price, area, city, district, content, thumbnail, images, user_id, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
       RETURNING *
       `,
       [
         title,
-        finalThumbnail,
         price,
         area,
         city,
         district,
-        content || null,
+        content || null, // Chú ý: Dùng cột content như trong DB thay vì description để tránh lỗi
+        thumbnail || null,
+        JSON.stringify(images || []),
         userId || null,
-        finalImages, // ⚠️ Thêm biến lưu ảnh vào query
-      ],
+      ]
     );
 
     return result.rows[0];
@@ -352,7 +222,7 @@ export class RoomsService {
       'price',
       'title',
       'thumbnail',
-      'images', // ⚠️ Thêm kiểm tra thay đổi mảng hình ảnh
+      'images', 
       'area',
       'city',
       'district',
@@ -389,7 +259,7 @@ export class RoomsService {
             isChanged = true;
           }
         } 
-        // ⚠️ So sánh riêng cho kiểu Mảng (images)
+        // So sánh riêng cho kiểu Mảng (images)
         else if (field === 'images') {
           const oldArr = typeof oldRoom[field] === 'string' ? oldRoom[field] : JSON.stringify(oldRoom[field] || []);
           const newArr = JSON.stringify(dto[field] || []);
@@ -445,7 +315,7 @@ export class RoomsService {
         city,
         district,
         content || null,
-        finalImagesUpdate, // ⚠️ Cập nhật luôn mảng hình
+        finalImagesUpdate,
         id,
       ],
     );

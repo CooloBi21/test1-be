@@ -1,6 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-import { IsString, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import { 
+  IsString, 
+  IsNotEmpty, 
+  IsNumber, 
+  IsOptional, 
+  IsArray 
+} from 'class-validator';
 
 export class CreateRoomDto {
   @ApiProperty({ description: 'Tiêu đề phòng trọ' })
@@ -37,4 +42,10 @@ export class CreateRoomDto {
   @IsString()
   @IsOptional()
   content?: string;
+
+  @ApiPropertyOptional({ description: 'Danh sách URL ảnh', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
 }

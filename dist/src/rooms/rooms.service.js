@@ -48,7 +48,7 @@ let RoomsService = class RoomsService {
         if (city && city !== 'undefined' && city !== '') {
             const cityClean = String(city).trim();
             const cityPadded = cityClean.padStart(2, '0');
-            query += ` AND (TRIM(r.city) = $${index} OR TRIM(r.city) =$${index + 1})`;
+            query += ` AND (TRIM(r.city) = $${index} OR TRIM(r.city) = $${index + 1})`;
             values.push(cityClean, cityPadded);
             index += 2;
         }
@@ -104,119 +104,16 @@ let RoomsService = class RoomsService {
       FROM rooms r
       LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
       LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
-      LEFT JOIN users u ON r.user_idChào bạn, nguyên nhân bạn đưa ra rất chính xác. Đoạn code mẫu bạn tham khảo đang viết bằng **TypeORM** (`, this.roomRepository.create(...) `), tuy nhiên trong file `, rooms.service.ts ` thực tế của bạn, bạn lại đang sử dụng **Raw SQL** thông qua `, pg, (0, pg_2.Pool) ` (`, this.pool.query(...) `).
-
-Vì vậy, mình đã sửa lại và chuyển đổi logic gán `, images ` cùng `, thumbnail ` vào thẳng câu lệnh `, INSERT, INTO ` (trong hàm `, createRoom `) và `, UPDATE ` (trong hàm `, updateRoom `) để tương thích với cấu trúc code hiện tại của bạn.
-
-Dưới đây là file `, rooms.service.ts ` đã được hoàn thiện.
-
-### File `, src / rooms / rooms.service.ts ` hoàn chỉnh
-
-` ``, typescript);
-        import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException, } from '@nestjs/common';
-        import { Pool } from 'pg';
-        import { DATABASE_POOL } from '../database/database.module';
-        import { NotificationsService } from '../notifications/notifications.service';
-        import { PrismaService } from '../prisma/prisma.service';
-        import { CreateRoomDto } from './dto/create-room.dto';
-        import { GetRoomsFilterDto } from './dto/get-rooms-filter.dto';
-        import { UpdateRoomDto } from './dto/update-room.dto';
-        let RoomsService = class RoomsService {
-            constructor(pool, prisma, notificationsService) {
-                this.pool = pool;
-                this.prisma = prisma;
-                this.notificationsService = notificationsService;
-            }
-            async getRooms(filterDto) {
-                const { city, district, minPrice, maxPrice, minArea, maxArea, userId } = filterDto;
-                let query = `
-      SELECT 
-        r.*, 
-        p.name AS city_name, 
-        d.name AS district_name 
-      FROM rooms r
-      LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
-      LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
-      WHERE 1 = 1
-    `;
-                const values = [];
-                let index = 1;
-                if (userId) {
-                    query += ` AND r.user_id = $${index++}`;
-                    values.push(Number(userId));
-                }
-                else {
-                    query += ` AND r.status = 'approved'`;
-                }
-                if (city && city !== 'undefined' && city !== '') {
-                    const cityClean = String(city).trim();
-                    const cityPadded = cityClean.padStart(2, '0');
-                    query += ` AND (TRIM(r.city) = $${index} OR TRIM(r.city) = $${index + 1})`;
-                    values.push(cityClean, cityPadded);
-                    index += 2;
-                }
-                if (district && district !== 'undefined' && district !== '') {
-                    const distClean = String(district).trim();
-                    query += ` AND TRIM(r.district) = $${index++}`;
-                    values.push(distClean);
-                }
-                if (minPrice !== undefined && minPrice !== '' && !isNaN(Number(minPrice))) {
-                    query += ` AND r.price >= $${index++}`;
-                    values.push(Number(minPrice));
-                }
-                if (maxPrice !== undefined && maxPrice !== '' && !isNaN(Number(maxPrice))) {
-                    query += ` AND r.price <= $${index++}`;
-                    values.push(Number(maxPrice));
-                }
-                if (minArea !== undefined && minArea !== '' && !isNaN(Number(minArea))) {
-                    query += ` AND r.area >= $${index++}`;
-                    values.push(Number(minArea));
-                }
-                if (maxArea !== undefined && maxArea !== '' && !isNaN(Number(maxArea))) {
-                    query += ` AND r.area <= $${index++}`;
-                    values.push(Number(maxArea));
-                }
-                query += ` ORDER BY r.id DESC`;
-                try {
-                    const result = await this.pool.query(query, values);
-                    return {
-                        total: result.rows.length,
-                        data: result.rows,
-                    };
-                }
-                catch (error) {
-                    console.error('❌ [SQL ERROR]:', error);
-                    throw error;
-                }
-            }
-            async getRoomById(id) {
-                const result = await this.pool.query(`
-      SELECT 
-        r.*, 
-        p.name AS city_name, 
-        d.name AS district_name,
-        CASE WHEN u.id IS NOT NULL THEN
-          json_build_object(
-            'id', u.id,
-            'full_name', u.full_name,
-            'phone', u.phone,
-            'avatar', u.avatar,
-            'is_verified', u.is_active
-          )
-        ELSE NULL END AS user
-      FROM rooms r
-      LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
-      LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
       LEFT JOIN users u ON r.user_id = u.id
       WHERE r.id = $1
       `, [id]);
-                if (result.rows.length === 0) {
-                    throw new common_2.NotFoundException('Không tìm thấy phòng');
-                }
-                return result.rows[0];
-            }
-            async findAllForAdmin() {
-                const result = await this.pool.query(`
+        if (result.rows.length === 0) {
+            throw new common_1.NotFoundException('Không tìm thấy phòng');
+        }
+        return result.rows[0];
+    }
+    async findAllForAdmin() {
+        const result = await this.pool.query(`
       SELECT 
         r.*, 
         p.name AS city_name, 
@@ -242,216 +139,204 @@ Dưới đây là file `, rooms.service.ts ` đã được hoàn thiện.
         END,
         r.id DESC
       `);
-                return {
-                    total: result.rows.length,
-                    data: result.rows,
-                };
-            }
-            async createRoom(dto, userId) {
-                const { title, thumbnail, price, area, city, district, content, images } = dto;
-                if (!title ||
-                    price === undefined ||
-                    area === undefined ||
-                    !city ||
-                    !district) {
-                    throw new common_2.BadRequestException('Thiếu thông tin bắt buộc');
-                }
-                const finalThumbnail = (images && images.length > 0) ? images[0] : (thumbnail || null);
-                const finalImages = images ? JSON.stringify(images) : '[]';
-                const result = await this.pool.query(`
-      INSERT INTO rooms (title, thumbnail, price, area, city, district, content, user_id, status, images)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
+        return {
+            total: result.rows.length,
+            data: result.rows,
+        };
+    }
+    async createRoom(dto, userId) {
+        const { title, price, area, city, district, content, thumbnail, images } = dto;
+        if (!title ||
+            price === undefined ||
+            area === undefined ||
+            !city ||
+            !district) {
+            throw new common_1.BadRequestException('Thiếu thông tin bắt buộc');
+        }
+        const result = await this.pool.query(`
+      INSERT INTO rooms (title, price, area, city, district, content, thumbnail, images, user_id, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
       RETURNING *
       `, [
-                    title,
-                    finalThumbnail,
-                    price,
-                    area,
-                    city,
-                    district,
-                    content || null,
-                    userId || null,
-                    finalImages,
-                ]);
-                return result.rows[0];
-            }
-            async updateRoom(id, dto, currentUserId) {
-                const roomCheck = await this.pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]);
-                if (roomCheck.rows.length === 0) {
-                    throw new common_2.NotFoundException('Không tìm thấy phòng');
-                }
-                const oldRoom = roomCheck.rows[0];
-                if (Number(oldRoom.user_id) !== Number(currentUserId)) {
-                    throw new common_2.ForbiddenException('Bạn không có quyền chỉnh sửa bài đăng này');
-                }
-                const changes = [];
-                const fieldsToCompare = [
-                    'price',
-                    'title',
-                    'thumbnail',
-                    'images',
-                    'area',
-                    'city',
-                    'district',
-                    'content',
-                ];
-                const fieldNamesVN = {
-                    price: 'giá thuê',
-                    title: 'tiêu đề',
-                    thumbnail: 'ảnh đại diện',
-                    images: 'danh sách ảnh',
-                    area: 'diện tích',
-                    city: 'tỉnh/thành phố',
-                    district: 'quận/huyện',
-                    content: 'nội dung mô tả',
-                };
-                fieldsToCompare.forEach((field) => {
-                    if (dto[field] !== undefined) {
-                        let isChanged = false;
-                        if (field === 'price' || field === 'area') {
-                            const oldNum = oldRoom[field] !== null && oldRoom[field] !== undefined
-                                ? Number(oldRoom[field])
-                                : 0;
-                            const newNum = dto[field] !== null && dto[field] !== undefined
-                                ? Number(dto[field])
-                                : 0;
-                            if (oldNum !== newNum) {
-                                isChanged = true;
-                            }
-                        }
-                        else if (field === 'images') {
-                            const oldArr = typeof oldRoom[field] === 'string' ? oldRoom[field] : JSON.stringify(oldRoom[field] || []);
-                            const newArr = JSON.stringify(dto[field] || []);
-                            if (oldArr !== newArr) {
-                                isChanged = true;
-                            }
-                        }
-                        else {
-                            const oldStr = oldRoom[field] ? String(oldRoom[field]).trim() : '';
-                            const newStr = dto[field] ? String(dto[field]).trim() : '';
-                            if (oldStr !== newStr) {
-                                isChanged = true;
-                            }
-                        }
-                        if (isChanged) {
-                            changes.push({
-                                field,
-                                oldValue: oldRoom[field],
-                                newValue: dto[field],
-                            });
-                        }
+            title,
+            price,
+            area,
+            city,
+            district,
+            content || null,
+            thumbnail || null,
+            JSON.stringify(images || []),
+            userId || null,
+        ]);
+        return result.rows[0];
+    }
+    async updateRoom(id, dto, currentUserId) {
+        const roomCheck = await this.pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]);
+        if (roomCheck.rows.length === 0) {
+            throw new common_1.NotFoundException('Không tìm thấy phòng');
+        }
+        const oldRoom = roomCheck.rows[0];
+        if (Number(oldRoom.user_id) !== Number(currentUserId)) {
+            throw new common_1.ForbiddenException('Bạn không có quyền chỉnh sửa bài đăng này');
+        }
+        const changes = [];
+        const fieldsToCompare = [
+            'price',
+            'title',
+            'thumbnail',
+            'images',
+            'area',
+            'city',
+            'district',
+            'content',
+        ];
+        const fieldNamesVN = {
+            price: 'giá thuê',
+            title: 'tiêu đề',
+            thumbnail: 'ảnh đại diện',
+            images: 'danh sách ảnh',
+            area: 'diện tích',
+            city: 'tỉnh/thành phố',
+            district: 'quận/huyện',
+            content: 'nội dung mô tả',
+        };
+        fieldsToCompare.forEach((field) => {
+            if (dto[field] !== undefined) {
+                let isChanged = false;
+                if (field === 'price' || field === 'area') {
+                    const oldNum = oldRoom[field] !== null && oldRoom[field] !== undefined
+                        ? Number(oldRoom[field])
+                        : 0;
+                    const newNum = dto[field] !== null && dto[field] !== undefined
+                        ? Number(dto[field])
+                        : 0;
+                    if (oldNum !== newNum) {
+                        isChanged = true;
                     }
-                });
-                if (changes.length === 0) {
-                    return { data: oldRoom, changes: [] };
                 }
-                const { title, thumbnail, price, area, city, district, content, images } = {
-                    ...oldRoom,
-                    ...dto,
-                };
-                const finalImagesUpdate = images ? JSON.stringify(images) : '[]';
-                const result = await this.pool.query(`
+                else if (field === 'images') {
+                    const oldArr = typeof oldRoom[field] === 'string' ? oldRoom[field] : JSON.stringify(oldRoom[field] || []);
+                    const newArr = JSON.stringify(dto[field] || []);
+                    if (oldArr !== newArr) {
+                        isChanged = true;
+                    }
+                }
+                else {
+                    const oldStr = oldRoom[field] ? String(oldRoom[field]).trim() : '';
+                    const newStr = dto[field] ? String(dto[field]).trim() : '';
+                    if (oldStr !== newStr) {
+                        isChanged = true;
+                    }
+                }
+                if (isChanged) {
+                    changes.push({
+                        field,
+                        oldValue: oldRoom[field],
+                        newValue: dto[field],
+                    });
+                }
+            }
+        });
+        if (changes.length === 0) {
+            return { data: oldRoom, changes: [] };
+        }
+        const { title, thumbnail, price, area, city, district, content, images } = {
+            ...oldRoom,
+            ...dto,
+        };
+        const finalImagesUpdate = images ? JSON.stringify(images) : '[]';
+        const result = await this.pool.query(`
       UPDATE rooms
       SET title = $1, thumbnail = $2, price = $3, area = $4, city = $5, district = $6, content = $7, images = $8
       WHERE id = $9
       RETURNING *
       `, [
-                    title,
-                    thumbnail || null,
-                    price,
-                    area,
-                    city,
-                    district,
-                    content || null,
-                    finalImagesUpdate,
-                    id,
-                ]);
-                const updatedRoom = result.rows[0];
-                const savedUsers = await this.prisma.saved_posts.findMany({
-                    where: { room_id: Number(id) },
-                    select: { user_id: true },
+            title,
+            thumbnail || null,
+            price,
+            area,
+            city,
+            district,
+            content || null,
+            finalImagesUpdate,
+            id,
+        ]);
+        const updatedRoom = result.rows[0];
+        const savedUsers = await this.prisma.saved_posts.findMany({
+            where: { room_id: Number(id) },
+            select: { user_id: true },
+        });
+        const changedFieldNames = changes
+            .map((c) => fieldNamesVN[c.field] || c.field)
+            .join(', ');
+        const priceChange = changes.find((c) => c.field === 'price');
+        let notiTitle = `Phòng đã lưu thay đổi ${changedFieldNames}`;
+        let notiBody = `Phòng "${updatedRoom.title}" vừa cập nhật: ${changedFieldNames}.`;
+        if (priceChange && changes.length === 1) {
+            notiTitle = 'Phòng đã lưu thay đổi giá';
+            notiBody = `Phòng "${updatedRoom.title}" đổi giá từ ${Number(priceChange.oldValue).toLocaleString('vi-VN')}đ sang ${Number(priceChange.newValue).toLocaleString('vi-VN')}đ.`;
+        }
+        for (const item of savedUsers) {
+            if (Number(item.user_id) !== Number(updatedRoom.user_id)) {
+                await this.notificationsService.createNotification({
+                    user_id: item.user_id,
+                    type: 'saved_room_updated',
+                    title: notiTitle,
+                    body: notiBody,
+                    target_url: `/rooms/${id}`,
+                    entity_type: 'room',
+                    entity_id: Number(id),
                 });
-                const changedFieldNames = changes
-                    .map((c) => fieldNamesVN[c.field] || c.field)
-                    .join(', ');
-                const priceChange = changes.find((c) => c.field === 'price');
-                let notiTitle = `Phòng đã lưu thay đổi ${changedFieldNames}`;
-                let notiBody = `Phòng "${updatedRoom.title}" vừa cập nhật: ${changedFieldNames}.`;
-                if (priceChange && changes.length === 1) {
-                    notiTitle = 'Phòng đã lưu thay đổi giá';
-                    notiBody = `Phòng "${updatedRoom.title}" đổi giá từ ${Number(priceChange.oldValue).toLocaleString('vi-VN')}đ sang ${Number(priceChange.newValue).toLocaleString('vi-VN')}đ.`;
-                }
-                for (const item of savedUsers) {
-                    if (Number(item.user_id) !== Number(updatedRoom.user_id)) {
-                        await this.notificationsService.createNotification({
-                            user_id: item.user_id,
-                            type: 'saved_room_updated',
-                            title: notiTitle,
-                            body: notiBody,
-                            target_url: `/rooms/${id}`,
-                            entity_type: 'room',
-                            entity_id: Number(id),
-                        });
-                    }
-                }
-                return { data: updatedRoom, changes };
             }
-            async updateRoomStatus(id, status) {
-                try {
-                    const updatedRoom = await this.prisma.rooms.update({
-                        where: { id: Number(id) },
-                        data: { status: status },
-                    });
-                    return {
-                        message: `Đã cập nhật trạng thái phòng thành ${status}`,
-                        room: updatedRoom,
-                    };
-                }
-                catch (error) {
-                    if (error?.code === 'P2025') {
-                        throw new common_2.NotFoundException('Không tìm thấy phòng với ID này!');
-                    }
-                    throw error;
-                }
+        }
+        return { data: updatedRoom, changes };
+    }
+    async updateRoomStatus(id, status) {
+        try {
+            const updatedRoom = await this.prisma.rooms.update({
+                where: { id: Number(id) },
+                data: { status: status },
+            });
+            return {
+                message: `Đã cập nhật trạng thái phòng thành ${status}`,
+                room: updatedRoom,
+            };
+        }
+        catch (error) {
+            if (error?.code === 'P2025') {
+                throw new common_1.NotFoundException('Không tìm thấy phòng với ID này!');
             }
-            async deleteRoom(id, currentUserId) {
-                const roomCheck = await this.pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]);
-                if (roomCheck.rows.length === 0) {
-                    throw new common_2.NotFoundException('Không tìm thấy phòng');
-                }
-                const roomData = roomCheck.rows[0];
-                if (Number(roomData.user_id) !== Number(currentUserId)) {
-                    throw new common_2.ForbiddenException('Bạn không có quyền xóa bài đăng này');
-                }
-                const savedUsers = await this.prisma.saved_posts.findMany({
-                    where: { room_id: Number(id) },
-                    select: { user_id: true },
+            throw error;
+        }
+    }
+    async deleteRoom(id, currentUserId) {
+        const roomCheck = await this.pool.query(`SELECT * FROM rooms WHERE id = $1`, [id]);
+        if (roomCheck.rows.length === 0) {
+            throw new common_1.NotFoundException('Không tìm thấy phòng');
+        }
+        const roomData = roomCheck.rows[0];
+        if (Number(roomData.user_id) !== Number(currentUserId)) {
+            throw new common_1.ForbiddenException('Bạn không có quyền xóa bài đăng này');
+        }
+        const savedUsers = await this.prisma.saved_posts.findMany({
+            where: { room_id: Number(id) },
+            select: { user_id: true },
+        });
+        const result = await this.pool.query(`DELETE FROM rooms WHERE id = $1 RETURNING *`, [id]);
+        for (const item of savedUsers) {
+            if (Number(item.user_id) !== Number(roomData.user_id)) {
+                await this.notificationsService.createNotification({
+                    user_id: item.user_id,
+                    type: 'saved_room_updated',
+                    title: 'Tin đã lưu đã bị gỡ',
+                    body: `Phòng "${roomData.title}" mà bạn đã lưu vừa bị chủ nhà xóa/gỡ khỏi hệ thống.`,
+                    target_url: `/saved-posts`,
+                    entity_type: 'room',
+                    entity_id: Number(id),
                 });
-                const result = await this.pool.query(`DELETE FROM rooms WHERE id = $1 RETURNING *`, [id]);
-                for (const item of savedUsers) {
-                    if (Number(item.user_id) !== Number(roomData.user_id)) {
-                        await this.notificationsService.createNotification({
-                            user_id: item.user_id,
-                            type: 'saved_room_updated',
-                            title: 'Tin đã lưu đã bị gỡ',
-                            body: `Phòng "${roomData.title}" mà bạn đã lưu vừa bị chủ nhà xóa/gỡ khỏi hệ thống.`,
-                            target_url: `/saved-posts`,
-                            entity_type: 'room',
-                            entity_id: Number(id),
-                        });
-                    }
-                }
-                return { message: 'Xóa phòng thành công', data: result.rows[0] };
             }
-        };
-        RoomsService = __decorate([
-            (0, common_2.Injectable)(),
-            __param(0, (0, common_2.Inject)(database_module_2.DATABASE_POOL)),
-            __metadata("design:paramtypes", [pg_2.Pool,
-                prisma_service_2.PrismaService,
-                notifications_service_2.NotificationsService])
-        ], RoomsService);
-        export { RoomsService };
+        }
+        return { message: 'Xóa phòng thành công', data: result.rows[0] };
     }
 };
 exports.RoomsService = RoomsService;
