@@ -18,7 +18,7 @@ const swagger_1 = require("@nestjs/swagger");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
-const rooms_service_1 = require("./rooms.service");
+const rooms_service_1 = require("../rooms/rooms.service");
 class UpdateRoomStatusDto {
 }
 exports.UpdateRoomStatusDto = UpdateRoomStatusDto;
@@ -34,6 +34,9 @@ let AdminController = class AdminController {
     constructor(roomsService) {
         this.roomsService = roomsService;
     }
+    async getAllRoomsForAdmin() {
+        return await this.roomsService.findAllForAdmin();
+    }
     async updateRoomStatus(id, status) {
         const validStatuses = ['approved', 'rejected'];
         if (!status || !validStatuses.includes(status)) {
@@ -43,6 +46,14 @@ let AdminController = class AdminController {
     }
 };
 exports.AdminController = AdminController;
+__decorate([
+    (0, common_1.Get)('rooms'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('admin'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], AdminController.prototype, "getAllRoomsForAdmin", null);
 __decorate([
     (0, common_1.Put)('rooms/:id/status'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),

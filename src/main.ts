@@ -7,9 +7,15 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // 1. Bật CORS (Hỗ trợ gọi từ Vercel hoặc bất kỳ domain nào được khai báo trong env)
+  // 1. Bật CORS (Lấy danh sách origin được phép bao gồm cả Local và Production Vercel)
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    process.env.FRONTEND_URL, // Ví dụ: https://test1-lake-ten.vercel.app
+  ].filter(Boolean) as string[];
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL || true,
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });

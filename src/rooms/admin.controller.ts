@@ -1,5 +1,6 @@
 import { 
   Controller, 
+  Get,
   Put, 
   Param, 
   Body, 
@@ -11,7 +12,7 @@ import { ApiBearerAuth, ApiTags, ApiProperty, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { RoomsService } from './rooms.service';
+import { RoomsService } from '../rooms/rooms.service';
 
 export class UpdateRoomStatusDto {
   @ApiProperty({
@@ -27,6 +28,13 @@ export class UpdateRoomStatusDto {
 @Controller('api/admin')
 export class AdminController {
   constructor(private readonly roomsService: RoomsService) {}
+
+  @Get('rooms')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async getAllRoomsForAdmin() {
+    return await this.roomsService.findAllForAdmin();
+  }
 
   @Put('rooms/:id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
