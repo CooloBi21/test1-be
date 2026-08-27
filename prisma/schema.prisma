@@ -108,6 +108,8 @@ model reviews {
   room_id    Int
   rating     Int       @db.SmallInt
   comment    String?   @db.Text
+  owner_reply String?   @db.Text
+  owner_reply_at DateTime? @db.Timestamp(6)
   created_at DateTime? @default(now()) @db.Timestamp(6)
   updated_at DateTime? @updatedAt @db.Timestamp(6)
 

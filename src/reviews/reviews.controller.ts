@@ -1,13 +1,25 @@
-import { Controller, Post, Get, Delete, Param, Body, Req, ParseIntPipe } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
-// import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-// @UseGuards(JwtAuthGuard)
 @Controller('api/reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   submitReview(
     @Req() req,
     @Body('room_id', ParseIntPipe) roomId: number,
@@ -17,17 +29,39 @@ export class ReviewsController {
     return this.reviewsService.upsertReview(req.user.id, roomId, rating, comment);
   }
 
+  @Get('room/:room_id')
+  getRoomReviews(
+    @Param('room_id', ParseIntPipe) roomId: number,
+    @Query('sort') sort?: string,
+    @Query('filter') filter?: string,
+  ) {
+    return this.reviewsService.getRoomReviews(roomId, { sort, filter });
+  }
+
+  @Patch(':review_id/owner-reply')
+  @UseGuards(JwtAuthGuard)
+  replyAsOwner(
+    @Req() req,
+    @Param('review_id', ParseIntPipe) reviewId: number,
+    @Body('reply') reply: string,
+  ) {
+    return this.reviewsService.replyAsOwner(req.user.id, reviewId, reply);
+  }
+
   @Get('my-reviews')
+  @UseGuards(JwtAuthGuard)
   getMyReviews(@Req() req) {
     return this.reviewsService.getMyReviews(req.user.id);
   }
 
   @Get('about-me')
+  @UseGuards(JwtAuthGuard)
   getReviewsAboutMe(@Req() req) {
     return this.reviewsService.getReviewsAboutMe(req.user.id);
   }
 
   @Delete(':review_id')
+  @UseGuards(JwtAuthGuard)
   deleteReview(@Req() req, @Param('review_id', ParseIntPipe) reviewId: number) {
     return this.reviewsService.deleteReview(req.user.id, reviewId);
   }
