@@ -8,6 +8,7 @@ pnpm-debug.log*
 
 node_modules
 .env
+dist/
 
 # Editor directories and files
 .vscode/*

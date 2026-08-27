@@ -33,12 +33,14 @@ model rooms {
   city          String          @db.VarChar(20)
   district      String          @db.VarChar(20)
   content       String?
+  amenities     Json            @default("[]")
   saved_by      saved_posts[]
   viewed_by     room_views[]
   reviews       reviews[]       @relation("reviews")
   conversations conversations[]
   reports       reports[]
   status        RoomStatus?     @default(pending)
+  created_at    DateTime?       @default(now()) @db.Timestamp(6)
   
   user          users?          @relation(fields: [user_id], references: [id], onDelete: SetNull)
   districts     districts       @relation(fields: [district], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "fk_room_district")

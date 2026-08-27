@@ -48,4 +48,10 @@ export class CreateRoomDto {
   @IsArray()
   @IsString({ each: true })
   images?: string[];
+
+  @ApiPropertyOptional({ description: 'Danh sÃ¡ch tiá»‡n Ã­ch phÃ²ng', type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  amenities?: string[];
 }

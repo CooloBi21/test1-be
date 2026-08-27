@@ -1,9 +1,14 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
 import { DatabaseService } from './database.service';
 
 export const DATABASE_POOL = 'DATABASE_POOL';
+
+// Keep Postgres `timestamp without time zone` values as raw strings.
+// node-postgres otherwise interprets them as local Date objects, which shifts
+// UTC timestamps before the frontend can format them as Vietnam time.
+types.setTypeParser(1114, (value) => value);
 
 @Global()
 @Module({

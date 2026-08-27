@@ -1,7 +1,8 @@
 import { 
   Controller, Get, Post, Put, Delete, Param, Query, Body, 
-  UseGuards, Req, UnauthorizedException 
+  UseGuards, Req, UnauthorizedException, UseInterceptors, UploadedFiles
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RoomsService } from './rooms.service';
 import { GetRoomsFilterDto } from './dto/get-rooms-filter.dto';
@@ -48,6 +49,25 @@ export class RoomsController {
       throw new UnauthorizedException('Không thể xác thực thông tin người dùng');
     }
     return this.roomsService.createRoom(dto, Number(userId));
+  }
+
+  @Post('images')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(
+    FilesInterceptor('images', 10, {
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload anh phong tro len Supabase Storage' })
+  uploadRoomImages(@UploadedFiles() files: any[], @Req() req: any) {
+    const userId = req.user?.id || req.user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException('KhÃ´ng thá»ƒ xÃ¡c thá»±c thÃ´ng tin ngÆ°á»i dÃ¹ng');
+    }
+    return this.roomsService.uploadRoomImages(files || [], Number(userId));
   }
 
   @Put(':id')

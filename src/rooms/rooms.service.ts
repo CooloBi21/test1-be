@@ -6,13 +6,29 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { Pool } from 'pg';
+import { createClient } from '@supabase/supabase-js';
 import { DATABASE_POOL } from '../database/database.module';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { GetRoomsFilterDto } from './dto/get-rooms-filter.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
+
+const ROOM_IMAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'ROOM-IMAGES';
+const ACCEPTED_IMAGE_EXTENSIONS = new Set([
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+  'gif',
+  'bmp',
+  'avif',
+  'heic',
+  'heif',
+  'svg',
+]);
 
 @Injectable()
 export class RoomsService {
@@ -23,6 +39,64 @@ export class RoomsService {
   ) {}
 
   // 1. LẤY DANH SÁCH PHÒNG TRỌ (Hỗ trợ lọc & bài đăng của tôi)
+  async uploadRoomImages(files: any[], userId: number) {
+    if (!files.length) {
+      throw new BadRequestException('Vui long chon it nhat 1 file anh');
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new BadRequestException(
+        'Backend chua cau hinh SUPABASE_URL hoac SUPABASE_SERVICE_ROLE_KEY/SUPABASE_KEY',
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    const uploadedImages = await Promise.all(
+      files.map(async (file) => {
+        const originalName = String(file.originalname || 'room-image');
+        const extension = originalName.split('.').pop()?.toLowerCase() || '';
+        const isImage =
+          String(file.mimetype || '').startsWith('image/') ||
+          ACCEPTED_IMAGE_EXTENSIONS.has(extension);
+
+        if (!isImage || !file.buffer) {
+          throw new BadRequestException(`File ${originalName} khong phai anh hop le`);
+        }
+
+        const safeExtension = ACCEPTED_IMAGE_EXTENSIONS.has(extension) ? extension : 'jpg';
+        const filePath = `rooms/${userId}/${Date.now()}-${randomUUID()}.${safeExtension}`;
+
+        const { error } = await supabase.storage
+          .from(ROOM_IMAGE_BUCKET)
+          .upload(filePath, file.buffer, {
+            contentType: file.mimetype || 'image/jpeg',
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (error) {
+          throw new BadRequestException(`Upload anh that bai: ${error.message}`);
+        }
+
+        const { data } = supabase.storage.from(ROOM_IMAGE_BUCKET).getPublicUrl(filePath);
+        return data.publicUrl;
+      }),
+    );
+
+    return {
+      urls: uploadedImages,
+    };
+  }
+
   async getRooms(filterDto: GetRoomsFilterDto & { userId?: number }) {
     const { city, district, minPrice, maxPrice, minArea, maxArea, userId } = filterDto;
 
@@ -30,10 +104,20 @@ export class RoomsService {
       SELECT 
         r.*, 
         p.name AS city_name, 
-        d.name AS district_name 
+        d.name AS district_name,
+        CASE WHEN u.id IS NOT NULL THEN
+          json_build_object(
+            'id', u.id,
+            'full_name', u.full_name,
+            'phone', u.phone,
+            'avatar', u.avatar,
+            'is_verified', u.is_active
+          )
+        ELSE NULL END AS user
       FROM rooms r
       LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
       LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
+      LEFT JOIN users u ON r.user_id = u.id
       WHERE 1 = 1
     `;
     const values: any[] = [];
@@ -164,7 +248,7 @@ export class RoomsService {
 
   // 3. TẠO PHÒNG TRỌ MỚI (Trạng thái mặc định là pending chờ duyệt)
   async createRoom(dto: CreateRoomDto, userId?: number) {
-    const { title, price, area, city, district, content, thumbnail, images } = dto;
+    const { title, price, area, city, district, content, thumbnail, images, amenities } = dto;
     
     if (
       !title ||
@@ -178,8 +262,8 @@ export class RoomsService {
 
     const result = await this.pool.query(
       `
-      INSERT INTO rooms (title, price, area, city, district, content, thumbnail, images, user_id, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+      INSERT INTO rooms (title, price, area, city, district, content, thumbnail, images, amenities, user_id, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
       RETURNING *
       `,
       [
@@ -191,6 +275,7 @@ export class RoomsService {
         content || null, // Chú ý: Dùng cột content như trong DB thay vì description để tránh lỗi
         thumbnail || null,
         JSON.stringify(images || []),
+        JSON.stringify(amenities || []),
         userId || null,
       ]
     );
@@ -223,6 +308,7 @@ export class RoomsService {
       'title',
       'thumbnail',
       'images', 
+      'amenities',
       'area',
       'city',
       'district',
@@ -234,6 +320,7 @@ export class RoomsService {
       title: 'tiêu đề',
       thumbnail: 'ảnh đại diện',
       images: 'danh sách ảnh',
+      amenities: 'tiện ích phòng',
       area: 'diện tích',
       city: 'tỉnh/thành phố',
       district: 'quận/huyện',
@@ -259,8 +346,8 @@ export class RoomsService {
             isChanged = true;
           }
         } 
-        // So sánh riêng cho kiểu Mảng (images)
-        else if (field === 'images') {
+        // So sánh riêng cho kiểu Mảng/JSON (images, amenities)
+        else if (field === 'images' || field === 'amenities') {
           const oldArr = typeof oldRoom[field] === 'string' ? oldRoom[field] : JSON.stringify(oldRoom[field] || []);
           const newArr = JSON.stringify(dto[field] || []);
           if (oldArr !== newArr) {
@@ -293,18 +380,19 @@ export class RoomsService {
     }
 
     // 4.4. Cập nhật vào DB
-    const { title, thumbnail, price, area, city, district, content, images } = {
+    const { title, thumbnail, price, area, city, district, content, images, amenities } = {
       ...oldRoom,
       ...dto,
     };
     
     const finalImagesUpdate = images ? JSON.stringify(images) : '[]';
+    const finalAmenitiesUpdate = amenities ? JSON.stringify(amenities) : '[]';
 
     const result = await this.pool.query(
       `
       UPDATE rooms
-      SET title = $1, thumbnail = $2, price = $3, area = $4, city = $5, district = $6, content = $7, images = $8
-      WHERE id = $9
+      SET title = $1, thumbnail = $2, price = $3, area = $4, city = $5, district = $6, content = $7, images = $8, amenities = $9
+      WHERE id = $10
       RETURNING *
       `,
       [
@@ -316,6 +404,7 @@ export class RoomsService {
         district,
         content || null,
         finalImagesUpdate,
+        finalAmenitiesUpdate,
         id,
       ],
     );
@@ -407,10 +496,29 @@ export class RoomsService {
     });
 
     // 6.4. Xóa bài đăng khỏi Database
-    const result = await this.pool.query(
-      `DELETE FROM rooms WHERE id = $1 RETURNING *`,
-      [id],
-    );
+    const client = await this.pool.connect();
+    let deletedRoom: any;
+
+    try {
+      await client.query('BEGIN');
+      await client.query(`DELETE FROM saved_posts WHERE room_id = $1`, [id]);
+      await client.query(`DELETE FROM room_views WHERE room_id = $1`, [id]);
+      await client.query(`DELETE FROM reviews WHERE room_id = $1`, [id]);
+      await client.query(`DELETE FROM reports WHERE room_id = $1`, [id]);
+      await client.query(`UPDATE conversations SET room_id = NULL WHERE room_id = $1`, [id]);
+
+      const result = await client.query(
+        `DELETE FROM rooms WHERE id = $1 RETURNING *`,
+        [id],
+      );
+      deletedRoom = result.rows[0];
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
 
     // 6.5. Báo cho người dùng đã lưu phòng biết tin bị gỡ
     for (const item of savedUsers) {
@@ -427,6 +535,6 @@ export class RoomsService {
       }
     }
 
-    return { message: 'Xóa phòng thành công', data: result.rows[0] };
+    return { message: 'Xóa phòng thành công', data: deletedRoom };
   }
 }
