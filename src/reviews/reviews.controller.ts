@@ -34,8 +34,9 @@ export class ReviewsController {
     @Param('room_id', ParseIntPipe) roomId: number,
     @Query('sort') sort?: string,
     @Query('filter') filter?: string,
+    @Query('viewerId') viewerId?: string,
   ) {
-    return this.reviewsService.getRoomReviews(roomId, { sort, filter });
+    return this.reviewsService.getRoomReviews(roomId, { sort, filter, viewerId: Number(viewerId || 0) });
   }
 
   @Patch(':review_id/owner-reply')
@@ -46,6 +47,16 @@ export class ReviewsController {
     @Body('reply') reply: string,
   ) {
     return this.reviewsService.replyAsOwner(req.user.id, reviewId, reply);
+  }
+
+  @Post(':review_id/reactions')
+  @UseGuards(JwtAuthGuard)
+  toggleReaction(
+    @Req() req,
+    @Param('review_id', ParseIntPipe) reviewId: number,
+    @Body('type') reactionType: string,
+  ) {
+    return this.reviewsService.toggleReaction(req.user.id, reviewId, reactionType);
   }
 
   @Get('my-reviews')

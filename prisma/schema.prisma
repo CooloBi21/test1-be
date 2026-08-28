@@ -25,7 +25,6 @@ model provinces {
 
 model rooms {
   id            Int             @id @default(autoincrement())
-  user_id       Int?          
   title         String
   thumbnail     String?
   price         Decimal         @db.Decimal(15, 2)
@@ -33,45 +32,46 @@ model rooms {
   city          String          @db.VarChar(20)
   district      String          @db.VarChar(20)
   content       String?
+  user_id       Int?
+  status        RoomStatus?     @default(pending)
+  images        Json?           @default("[]")
   amenities     Json            @default("[]")
-  saved_by      saved_posts[]
-  viewed_by     room_views[]
-  reviews       reviews[]       @relation("reviews")
+  updated_at    DateTime?       @default(now()) @db.Timestamp(6)
+  created_at    DateTime?       @default(now()) @db.Timestamp(6)
   conversations conversations[]
   reports       reports[]
-  status        RoomStatus?     @default(pending)
-  created_at    DateTime?       @default(now()) @db.Timestamp(6)
-  
-  user          users?          @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  reviews       reviews[]       @relation("reviews")
+  viewed_by     room_views[]
   districts     districts       @relation(fields: [district], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "fk_room_district")
   provinces     provinces       @relation(fields: [city], references: [code], onDelete: NoAction, onUpdate: NoAction, map: "fk_room_province")
+  user          users?          @relation(fields: [user_id], references: [id])
+  saved_by      saved_posts[]
 }
 
 model users {
-  id                  Int             @id @default(autoincrement())
-  full_name           String          @db.VarChar(100)
-  email               String          @unique @db.VarChar(100)
-  password            String          @db.VarChar(255)
-  phone               String?         @db.VarChar(20)
-  avatar              String?         @db.VarChar(255)
-  role                Role?           @default(renter)
-  created_at          DateTime?       @default(now()) @db.Timestamp(6)
-  
-  rooms               rooms[]
-  saved_posts         saved_posts[]
-  room_views          room_views[]
-  reviews             reviews[]       @relation("reviewer")
-  conversations_user1 conversations[] @relation("user1")
-  conversations_user2 conversations[] @relation("user2")
-  messages            messages[]      @relation("sender")
+  id                  Int                @id @default(autoincrement())
+  full_name           String             @db.VarChar(100)
+  email               String             @unique @db.VarChar(100)
+  password            String             @db.VarChar(255)
+  phone               String?            @db.VarChar(20)
+  avatar              String?            @db.VarChar(255)
+  role                Role?              @default(renter)
+  created_at          DateTime?          @default(now()) @db.Timestamp(6)
+  is_active           Boolean            @default(false)
+  verification_token  String?            @db.VarChar(255)
+  ban_reason          String?
+  is_banned           Boolean            @default(false)
+  conversations_user1 conversations[]    @relation("user1")
+  conversations_user2 conversations[]    @relation("user2")
+  messages            messages[]         @relation("sender")
   notifications       notifications[]
   reports             reports[]
-  is_active           Boolean         @default(false)
-  verification_token  String?         @db.VarChar(255)
-  is_banned           Boolean         @default(false)
-  ban_reason          String?         @db.Text
-
-  support_tickets support_tickets[]
+  review_reactions    review_reactions[]
+  reviews             reviews[]          @relation("reviewer")
+  room_views          room_views[]
+  rooms               rooms[]
+  saved_posts         saved_posts[]
+  support_tickets     support_tickets[]
 }
 
 model saved_posts {
@@ -79,9 +79,8 @@ model saved_posts {
   user_id    Int
   room_id    Int
   created_at DateTime? @default(now()) @db.Timestamp(6)
-
-  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  room rooms @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  room       rooms     @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user       users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, room_id])
   @@index([user_id])
@@ -93,9 +92,8 @@ model room_views {
   user_id   Int
   room_id   Int
   viewed_at DateTime? @default(now()) @db.Timestamp(6)
-
-  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  room rooms @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  room      rooms     @relation(fields: [room_id], references: [id], onDelete: Cascade)
+  user      users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([room_id])
@@ -103,36 +101,49 @@ model room_views {
 }
 
 model reviews {
-  id         Int       @id @default(autoincrement())
-  user_id    Int
-  room_id    Int
-  rating     Int       @db.SmallInt
-  comment    String?   @db.Text
-  owner_reply String?   @db.Text
-  owner_reply_at DateTime? @db.Timestamp(6)
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-  updated_at DateTime? @updatedAt @db.Timestamp(6)
-
-  user users @relation("reviewer", fields: [user_id], references: [id], onDelete: Cascade)
-  room rooms @relation("reviews", fields: [room_id], references: [id], onDelete: Cascade)
+  id             Int                @id @default(autoincrement())
+  user_id        Int
+  room_id        Int
+  rating         Int                @db.SmallInt
+  comment        String?
+  created_at     DateTime?          @default(now()) @db.Timestamp(6)
+  updated_at     DateTime?          @updatedAt @db.Timestamp(6)
+  owner_reply    String?
+  owner_reply_at DateTime?          @db.Timestamp(6)
+  reactions      review_reactions[]
+  room           rooms              @relation("reviews", fields: [room_id], references: [id], onDelete: Cascade)
+  user           users              @relation("reviewer", fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, room_id])
   @@index([user_id])
   @@index([room_id])
 }
 
-model conversations {
-  id         Int       @id @default(autoincrement())
-  room_id    Int?
-  user_1_id  Int        // Người bắt đầu chat (Renter)
-  user_2_id  Int        // Chủ nhà (Landlord)
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-  updated_at DateTime? @updatedAt @db.Timestamp(6)
+model review_reactions {
+  id            Int       @id @default(autoincrement())
+  review_id     Int
+  user_id       Int
+  reaction_type String    @db.VarChar(30)
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  review        reviews   @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user          users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  room     rooms?    @relation(fields: [room_id], references: [id], onDelete: SetNull)
-  user1    users     @relation("user1", fields: [user_1_id], references: [id], onDelete: Cascade)
-  user2    users     @relation("user2", fields: [user_2_id], references: [id], onDelete: Cascade)
-  messages messages[]
+  @@unique([review_id, user_id, reaction_type])
+  @@index([review_id], map: "idx_review_reactions_review_id")
+  @@index([user_id], map: "idx_review_reactions_user_id")
+}
+
+model conversations {
+  id         Int        @id @default(autoincrement())
+  room_id    Int?
+  user_1_id  Int
+  user_2_id  Int
+  created_at DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at DateTime?  @updatedAt @db.Timestamp(6)
+  room       rooms?     @relation(fields: [room_id], references: [id])
+  user1      users      @relation("user1", fields: [user_1_id], references: [id], onDelete: Cascade)
+  user2      users      @relation("user2", fields: [user_2_id], references: [id], onDelete: Cascade)
+  messages   messages[]
 
   @@unique([user_1_id, user_2_id, room_id])
 }
@@ -141,27 +152,25 @@ model messages {
   id              Int           @id @default(autoincrement())
   conversation_id Int
   sender_id       Int
-  text            String        @db.Text
+  text            String
   is_read         Boolean       @default(false)
   created_at      DateTime?     @default(now()) @db.Timestamp(6)
-
-  conversation conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
-  sender       users         @relation("sender", fields: [sender_id], references: [id], onDelete: Cascade)
+  conversation    conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  sender          users         @relation("sender", fields: [sender_id], references: [id], onDelete: Cascade)
 }
 
 model notifications {
   id          Int       @id @default(autoincrement())
   user_id     Int
-  type        String    @db.VarChar(50) // 'saved_room_updated', 'room_reviewed', 'system', 'saved_search_match'
+  type        String    @db.VarChar(50)
   title       String    @db.VarChar(255)
-  body        String?   @db.Text
+  body        String?
   target_url  String?   @db.VarChar(255)
-  entity_type String?   @db.VarChar(50) // 'room', 'review'
+  entity_type String?   @db.VarChar(50)
   entity_id   Int?
   is_read     Boolean   @default(false)
   created_at  DateTime? @default(now()) @db.Timestamp(6)
-
-  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user        users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id, is_read])
   @@index([created_at])
@@ -171,13 +180,11 @@ model reports {
   id          Int      @id @default(autoincrement())
   room_id     Int
   reporter_id Int
-  reason      String   @db.Text
-  status      String   @default("pending") // 'pending' | 'resolved' | 'dismissed'
+  reason      String
+  status      String   @default("pending")
   created_at  DateTime @default(now())
-
-  // Relations
-  room     rooms @relation(fields: [room_id], references: [id], onDelete: Cascade)
-  reporter users @relation(fields: [reporter_id], references: [id], onDelete: Cascade)
+  reporter    users    @relation(fields: [reporter_id], references: [id], onDelete: Cascade)
+  room        rooms    @relation(fields: [room_id], references: [id], onDelete: Cascade)
 
   @@index([room_id])
   @@index([reporter_id])
@@ -187,13 +194,12 @@ model support_tickets {
   id          Int            @id @default(autoincrement())
   user_id     Int
   category    TicketCategory
-  message     String         @db.Text
+  message     String
   status      TicketStatus   @default(open)
-  admin_reply String?        @db.Text
+  admin_reply String?
   created_at  DateTime       @default(now())
   updated_at  DateTime       @updatedAt
-
-  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user        users          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([status])

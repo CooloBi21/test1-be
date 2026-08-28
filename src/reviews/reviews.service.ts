@@ -5,7 +5,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 type ReviewQueryOptions = {
   sort?: string;
   filter?: string;
+  viewerId?: number;
 };
+
+const REVIEW_REACTION_TYPES = new Set(['helpful', 'like', 'trusted', 'love']);
 
 @Injectable()
 export class ReviewsService {
@@ -19,7 +22,10 @@ export class ReviewsService {
       where: { user_id_room_id: { user_id: userId, room_id: roomId } },
       update: { rating, comment },
       create: { user_id: userId, room_id: roomId, rating, comment },
-      include: { room: true, user: { select: { full_name: true } } },
+      include: {
+        room: true,
+        user: { select: { full_name: true } },
+      },
     });
 
     if (review.room && review.room.user_id && review.room.user_id !== userId) {
@@ -39,7 +45,7 @@ export class ReviewsService {
 
   async getRoomReviews(roomId: number, options: ReviewQueryOptions = {}) {
     const sort = options.sort || 'latest';
-    const filter = options.filter || 'all';
+    const viewerId = Number.isFinite(options.viewerId) ? Number(options.viewerId) : 0;
 
     const orderClause =
       sort === 'rating_desc'
@@ -47,11 +53,6 @@ export class ReviewsService {
         : sort === 'rating_asc'
           ? 'r.rating ASC, r.created_at DESC'
           : 'r.created_at DESC';
-
-    const filterClause =
-      filter === 'with_reply'
-        ? 'AND NULLIF(BTRIM(COALESCE(r.owner_reply, \'\')), \'\') IS NOT NULL'
-        : '';
 
     return this.prisma.$queryRawUnsafe(
       `
@@ -61,10 +62,26 @@ export class ReviewsService {
         r.room_id,
         r.rating,
         r.comment,
+        '[]'::jsonb AS images,
         r.owner_reply,
         r.owner_reply_at,
         r.created_at,
         r.updated_at,
+        (
+          SELECT COALESCE(jsonb_object_agg(reaction_type, reaction_count), '{}'::jsonb)
+          FROM (
+            SELECT reaction_type, COUNT(*)::int AS reaction_count
+            FROM review_reactions rr
+            WHERE rr.review_id = r.id
+            GROUP BY reaction_type
+          ) reaction_counts
+        ) AS reactions,
+        (
+          SELECT COALESCE(jsonb_agg(rr_me.reaction_type), '[]'::jsonb)
+          FROM review_reactions rr_me
+          WHERE rr_me.review_id = r.id
+            AND rr_me.user_id = $2
+        ) AS current_user_reactions,
         json_build_object(
           'id', u.id,
           'full_name', u.full_name,
@@ -84,10 +101,10 @@ export class ReviewsService {
       FROM reviews r
       JOIN users u ON u.id = r.user_id
       WHERE r.room_id = $1
-      ${filterClause}
       ORDER BY ${orderClause}
       `,
       roomId,
+      viewerId,
     );
   }
 
@@ -113,25 +130,13 @@ export class ReviewsService {
       throw new ForbiddenException('Chỉ chủ bài đăng mới có quyền phản hồi đánh giá này');
     }
 
-    const updatedRows = await this.prisma.$queryRawUnsafe<any[]>(
-      `
-      UPDATE reviews
-      SET owner_reply = $1, owner_reply_at = now()
-      WHERE id = $2
-      RETURNING
-        id,
-        user_id,
-        room_id,
-        rating,
-        comment,
-        owner_reply,
-        owner_reply_at,
-        created_at,
-        updated_at
-      `,
-      trimmedReply,
-      reviewId,
-    );
+    const updatedReview = await this.prisma.reviews.update({
+      where: { id: reviewId },
+      data: {
+        owner_reply: trimmedReply,
+        owner_reply_at: new Date(),
+      },
+    });
 
     if (review.user_id !== ownerId) {
       await this.notificationsService.createNotification({
@@ -145,7 +150,74 @@ export class ReviewsService {
       });
     }
 
-    return updatedRows[0];
+    return updatedReview;
+  }
+
+  async toggleReaction(userId: number, reviewId: number, reactionType: string) {
+    const normalizedType = String(reactionType || '').trim().toLowerCase();
+    if (!REVIEW_REACTION_TYPES.has(normalizedType)) {
+      throw new BadRequestException('Loại cảm xúc không hợp lệ');
+    }
+
+    const review = await this.prisma.reviews.findUnique({
+      where: { id: reviewId },
+      select: { id: true },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Không tìm thấy đánh giá');
+    }
+
+    const existing = await this.prisma.review_reactions.findFirst({
+      where: {
+        review_id: reviewId,
+        user_id: userId,
+      },
+    });
+
+    let isActive = false;
+
+    if (existing) {
+      if (existing.reaction_type === normalizedType) {
+        await this.prisma.review_reactions.delete({
+          where: { id: existing.id },
+        });
+        isActive = false;
+      } else {
+        await this.prisma.review_reactions.update({
+          where: { id: existing.id },
+          data: { reaction_type: normalizedType },
+        });
+        isActive = true;
+      }
+    } else {
+      await this.prisma.review_reactions.create({
+        data: {
+          review_id: reviewId,
+          user_id: userId,
+          reaction_type: normalizedType,
+        },
+      });
+      isActive = true;
+    }
+
+    const counts = await this.prisma.review_reactions.groupBy({
+      by: ['reaction_type'],
+      where: { review_id: reviewId },
+      _count: { reaction_type: true },
+    });
+
+    const reactions = counts.reduce((acc, item) => {
+      acc[item.reaction_type] = item._count.reaction_type;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      review_id: reviewId,
+      type: normalizedType,
+      active: isActive,
+      reactions,
+    };
   }
 
   async getMyReviews(userId: number) {
