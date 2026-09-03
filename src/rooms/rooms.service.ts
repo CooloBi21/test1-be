@@ -177,36 +177,37 @@ export class RoomsService {
     }
   }
 
-  // 2. LẤY CHI TIẾT 1 PHÒNG TRỌ (Đã JOIN kèm thông tin User/Owner)
+  // 2. LẤY CHI TIẾT 1 PHÒNG TRỌ (Sử dụng Prisma)
   async getRoomById(id: string) {
-    const result = await this.pool.query(
-      `
-      SELECT 
-        r.*, 
-        p.name AS city_name, 
-        d.name AS district_name,
-        CASE WHEN u.id IS NOT NULL THEN
-          json_build_object(
-            'id', u.id,
-            'full_name', u.full_name,
-            'phone', u.phone,
-            'avatar', u.avatar,
-            'is_verified', u.is_active
-          )
-        ELSE NULL END AS user
-      FROM rooms r
-      LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
-      LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
-      LEFT JOIN users u ON r.user_id = u.id
-      WHERE r.id = $1
-      `,
-      [id],
-    );
+    const room = await this.prisma.rooms.findUnique({
+      where: {
+        id: Number(id),
+      },
+      include: {
+        provinces: true,
+        districts: true,
+        user: true,
+      },
+    });
 
-    if (result.rows.length === 0) {
+    if (!room) {
       throw new NotFoundException('Không tìm thấy phòng');
     }
-    return result.rows[0];
+
+    return {
+      ...room,
+      city_name: room.provinces?.name ?? null,
+      district_name: room.districts?.name ?? null,
+      user: room.user
+        ? {
+            id: room.user.id,
+            full_name: room.user.full_name,
+            phone: room.user.phone,
+            avatar: room.user.avatar,
+            is_verified: room.user.is_active,
+          }
+        : null,
+    };
   }
 
   // 2b. LẤY TẤT CẢ PHÒNG CHO ADMIN (mọi trạng thái, ưu tiên chờ duyệt)
