@@ -146,6 +146,11 @@ describe('RoomsService', () => {
       });
 
       expect(mockPool.query).toHaveBeenCalledTimes(1);
+
+      const [sql, params] = mockPool.query.mock.calls[0];
+      expect(sql).toContain("r.status = 'approved'");
+      expect(sql).toContain('ORDER BY r.id DESC');
+      expect(params).toEqual([]);
     });
 
     it('should return rooms belonging to the specified user', async () => {
@@ -171,6 +176,113 @@ describe('RoomsService', () => {
       });
 
       expect(mockPool.query).toHaveBeenCalledTimes(1);
+    });
+
+    it('should filter approved rooms and order by id descending for public request', async () => {
+      mockPool.query.mockResolvedValue({
+        rows: [],
+      });
+
+      await service.getRooms({});
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining("AND r.status = 'approved'"),
+        [],
+      );
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY r.id DESC'),
+        [],
+      );
+    });
+
+    it('should filter rooms by userId when userId is provided', async () => {
+      mockPool.query.mockResolvedValue({
+        rows: [],
+      });
+
+      await service.getRooms({
+        userId: 5,
+      });
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('AND r.user_id = $1'),
+        [5],
+      );
+    });
+
+    it('should filter rooms by city code', async () => {
+      mockPool.query.mockResolvedValue({
+        rows: [],
+      });
+
+      await service.getRooms({
+        city: '1',
+      });
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'AND (TRIM(r.city) = $1 OR TRIM(r.city) = $2)',
+        ),
+        ['1', '01'],
+      );
+    });
+
+    it('should filter rooms by district code', async () => {
+      mockPool.query.mockResolvedValue({
+        rows: [],
+      });
+
+      await service.getRooms({
+        district: '760',
+      });
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('AND TRIM(r.district) = $1'),
+        ['760'],
+      );
+    });
+
+    it('should filter rooms by minimum and maximum price', async () => {
+      mockPool.query.mockResolvedValue({
+        rows: [],
+      });
+
+      await service.getRooms({
+        minPrice: '2000000',
+        maxPrice: '5000000',
+      });
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('AND r.price >= $1'),
+        [2000000, 5000000],
+      );
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('AND r.price <= $2'),
+        [2000000, 5000000],
+      );
+    });
+
+    it('should filter rooms by minimum and maximum area', async () => {
+      mockPool.query.mockResolvedValue({
+        rows: [],
+      });
+
+      await service.getRooms({
+        minArea: '20',
+        maxArea: '50',
+      });
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('AND r.area >= $1'),
+        [20, 50],
+      );
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining('AND r.area <= $2'),
+        [20, 50],
+      );
     });
   });
 });
