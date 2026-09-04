@@ -1,4 +1,6 @@
+// src/rooms/rooms.service.spec.ts
 import { NotFoundException } from '@nestjs/common';
+import { RoomStatus } from '@prisma/client';
 import { RoomsService } from './rooms.service';
 
 describe('RoomsService', () => {
@@ -11,6 +13,7 @@ describe('RoomsService', () => {
   const mockPrisma = {
     rooms: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
   };
 
@@ -126,31 +129,55 @@ describe('RoomsService', () => {
           id: 2,
           title: 'Phòng trọ 2',
           status: 'approved',
+          provinces: null,
+          districts: null,
+          user: null,
         },
         {
           id: 1,
           title: 'Phòng trọ 1',
           status: 'approved',
+          provinces: null,
+          districts: null,
+          user: null,
         },
       ];
 
-      mockPool.query.mockResolvedValue({
-        rows: mockRooms,
-      });
+      mockPrisma.rooms.findMany.mockResolvedValue(mockRooms);
 
       const result = await service.getRooms({});
 
       expect(result).toEqual({
         total: 2,
-        data: mockRooms,
+        data: [
+          {
+            ...mockRooms[0],
+            city_name: null,
+            district_name: null,
+            user: null,
+          },
+          {
+            ...mockRooms[1],
+            city_name: null,
+            district_name: null,
+            user: null,
+          },
+        ],
       });
 
-      expect(mockPool.query).toHaveBeenCalledTimes(1);
-
-      const [sql, params] = mockPool.query.mock.calls[0];
-      expect(sql).toContain("r.status = 'approved'");
-      expect(sql).toContain('ORDER BY r.id DESC');
-      expect(params).toEqual([]);
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledWith({
+        where: {
+          status: RoomStatus.approved,
+        },
+        include: {
+          provinces: true,
+          districts: true,
+          user: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
+      });
     });
 
     it('should return rooms belonging to the specified user', async () => {
@@ -159,130 +186,179 @@ describe('RoomsService', () => {
           id: 10,
           title: 'Phòng của user 5',
           user_id: 5,
+          provinces: null,
+          districts: null,
+          user: null,
         },
       ];
 
-      mockPool.query.mockResolvedValue({
-        rows: mockRooms,
-      });
+      mockPrisma.rooms.findMany.mockResolvedValue(mockRooms);
 
-      const result = await service.getRooms({
-        userId: 5,
-      });
+      const result = await service.getRooms({ userId: 5 });
 
       expect(result).toEqual({
         total: 1,
-        data: mockRooms,
+        data: [
+          {
+            ...mockRooms[0],
+            city_name: null,
+            district_name: null,
+            user: null,
+          },
+        ],
       });
 
-      expect(mockPool.query).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledWith({
+        where: {
+          user_id: 5,
+        },
+        include: {
+          provinces: true,
+          districts: true,
+          user: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
+      });
     });
 
     it('should filter approved rooms and order by id descending for public request', async () => {
-      mockPool.query.mockResolvedValue({
-        rows: [],
-      });
+      mockPrisma.rooms.findMany.mockResolvedValue([]);
 
       await service.getRooms({});
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining("AND r.status = 'approved'"),
-        [],
-      );
-
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY r.id DESC'),
-        [],
-      );
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledWith({
+        where: {
+          status: RoomStatus.approved,
+        },
+        include: {
+          provinces: true,
+          districts: true,
+          user: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
+      });
     });
 
     it('should filter rooms by userId when userId is provided', async () => {
-      mockPool.query.mockResolvedValue({
-        rows: [],
-      });
+      mockPrisma.rooms.findMany.mockResolvedValue([]);
 
-      await service.getRooms({
-        userId: 5,
-      });
+      await service.getRooms({ userId: 5 });
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('AND r.user_id = $1'),
-        [5],
-      );
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledWith({
+        where: {
+          user_id: 5,
+        },
+        include: {
+          provinces: true,
+          districts: true,
+          user: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
+      });
     });
 
     it('should filter rooms by city code', async () => {
-      mockPool.query.mockResolvedValue({
-        rows: [],
-      });
+      mockPrisma.rooms.findMany.mockResolvedValue([]);
 
-      await service.getRooms({
-        city: '1',
-      });
+      await service.getRooms({ city: '1' });
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'AND (TRIM(r.city) = $1 OR TRIM(r.city) = $2)',
-        ),
-        ['1', '01'],
-      );
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledWith({
+        where: {
+          status: RoomStatus.approved,
+          city: {
+            in: ['1', '01'],
+          },
+        },
+        include: {
+          provinces: true,
+          districts: true,
+          user: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
+      });
     });
 
     it('should filter rooms by district code', async () => {
-      mockPool.query.mockResolvedValue({
-        rows: [],
-      });
+      mockPrisma.rooms.findMany.mockResolvedValue([]);
 
-      await service.getRooms({
-        district: '760',
-      });
+      await service.getRooms({ district: '760' });
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('AND TRIM(r.district) = $1'),
-        ['760'],
-      );
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledWith({
+        where: {
+          status: RoomStatus.approved,
+          district: '760',
+        },
+        include: {
+          provinces: true,
+          districts: true,
+          user: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
+      });
     });
 
     it('should filter rooms by minimum and maximum price', async () => {
-      mockPool.query.mockResolvedValue({
-        rows: [],
-      });
+      mockPrisma.rooms.findMany.mockResolvedValue([]);
 
       await service.getRooms({
         minPrice: '2000000',
         maxPrice: '5000000',
       });
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('AND r.price >= $1'),
-        [2000000, 5000000],
-      );
-
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('AND r.price <= $2'),
-        [2000000, 5000000],
-      );
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledWith({
+        where: {
+          status: RoomStatus.approved,
+          price: {
+            gte: 2000000,
+            lte: 5000000,
+          },
+        },
+        include: {
+          provinces: true,
+          districts: true,
+          user: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
+      });
     });
 
     it('should filter rooms by minimum and maximum area', async () => {
-      mockPool.query.mockResolvedValue({
-        rows: [],
-      });
+      mockPrisma.rooms.findMany.mockResolvedValue([]);
 
       await service.getRooms({
         minArea: '20',
         maxArea: '50',
       });
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('AND r.area >= $1'),
-        [20, 50],
-      );
-
-      expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('AND r.area <= $2'),
-        [20, 50],
-      );
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledWith({
+        where: {
+          status: RoomStatus.approved,
+          area: {
+            gte: 20,
+            lte: 50,
+          },
+        },
+        include: {
+          provinces: true,
+          districts: true,
+          user: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
+      });
     });
 
     it('should preserve room response mapping from database result', async () => {
@@ -294,27 +370,123 @@ describe('RoomsService', () => {
           area: 25,
           city: '79',
           district: '760',
-          city_name: 'TP. Hồ Chí Minh',
-          district_name: 'Quận 1',
+          provinces: {
+            name: 'TP. Hồ Chí Minh',
+          },
+          districts: {
+            name: 'Quận 1',
+          },
           user: {
             id: 5,
             full_name: 'Nguyễn Văn Test',
             phone: '0123456789',
             avatar: 'avatar.jpg',
-            is_verified: true,
+            is_active: true,
           },
         },
       ];
 
-      mockPool.query.mockResolvedValue({
-        rows: mockRooms,
-      });
+      mockPrisma.rooms.findMany.mockResolvedValue(mockRooms);
 
       const result = await service.getRooms({});
 
       expect(result).toEqual({
         total: 1,
-        data: mockRooms,
+        data: [
+          {
+            ...mockRooms[0],
+            city_name: 'TP. Hồ Chí Minh',
+            district_name: 'Quận 1',
+            user: {
+              id: 5,
+              full_name: 'Nguyễn Văn Test',
+              phone: '0123456789',
+              avatar: 'avatar.jpg',
+              is_verified: true,
+            },
+          },
+        ],
+      });
+    });
+
+    it('should query rooms with Prisma using filters and relations', async () => {
+      const mockRooms = [
+        {
+          id: 10,
+          title: 'Phòng trọ test',
+          price: 2500000,
+          area: 25,
+          city: '79',
+          district: '760',
+          provinces: {
+            name: 'TP. Hồ Chí Minh',
+          },
+          districts: {
+            name: 'Quận 1',
+          },
+          user: {
+            id: 5,
+            full_name: 'Nguyễn Văn Test',
+            phone: '0123456789',
+            avatar: 'avatar.jpg',
+            is_active: true,
+          },
+        },
+      ];
+
+      mockPrisma.rooms.findMany.mockResolvedValue(mockRooms);
+
+      const result = await service.getRooms({
+        city: '1',
+        district: '760',
+        minPrice: '2000000',
+        maxPrice: '5000000',
+        minArea: '20',
+        maxArea: '50',
+      });
+
+      expect(result).toEqual({
+        total: 1,
+        data: [
+          {
+            ...mockRooms[0],
+            city_name: 'TP. Hồ Chí Minh',
+            district_name: 'Quận 1',
+            user: {
+              id: 5,
+              full_name: 'Nguyễn Văn Test',
+              phone: '0123456789',
+              avatar: 'avatar.jpg',
+              is_verified: true,
+            },
+          },
+        ],
+      });
+
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledWith({
+        where: {
+          status: RoomStatus.approved,
+          city: {
+            in: ['1', '01'],
+          },
+          district: '760',
+          price: {
+            gte: 2000000,
+            lte: 5000000,
+          },
+          area: {
+            gte: 20,
+            lte: 50,
+          },
+        },
+        include: {
+          provinces: true,
+          districts: true,
+          user: true,
+        },
+        orderBy: {
+          id: 'desc',
+        },
       });
     });
   });

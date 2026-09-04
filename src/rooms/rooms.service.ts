@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Pool } from 'pg';
+import { RoomStatus } from '@prisma/client';
 import { createClient } from '@supabase/supabase-js';
 import { DATABASE_POOL } from '../database/database.module';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -100,81 +101,85 @@ export class RoomsService {
   async getRooms(filterDto: GetRoomsFilterDto & { userId?: number }) {
     const { city, district, minPrice, maxPrice, minArea, maxArea, userId } = filterDto;
 
-    let query = `
-      SELECT 
-        r.*, 
-        p.name AS city_name, 
-        d.name AS district_name,
-        CASE WHEN u.id IS NOT NULL THEN
-          json_build_object(
-            'id', u.id,
-            'full_name', u.full_name,
-            'phone', u.phone,
-            'avatar', u.avatar,
-            'is_verified', u.is_active
-          )
-        ELSE NULL END AS user
-      FROM rooms r
-      LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
-      LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
-      LEFT JOIN users u ON r.user_id = u.id
-      WHERE 1 = 1
-    `;
-    const values: any[] = [];
-    let index = 1;
-
-    // Tách biệt quyền xem phòng: Chủ trọ xem tất cả phòng của họ, công khai chỉ hiển thị phòng đã duyệt 'approved'
+    const where: any = {};
     if (userId) {
-      query += ` AND r.user_id = $${index++}`;
-      values.push(Number(userId));
+      where.user_id = Number(userId);
     } else {
-      query += ` AND r.status = 'approved'`;
+      where.status = RoomStatus.approved;
     }
 
     if (city && city !== 'undefined' && city !== '') {
       const cityClean = String(city).trim();
       const cityPadded = cityClean.padStart(2, '0');
-      query += ` AND (TRIM(r.city) = $${index} OR TRIM(r.city) = $${index + 1})`;
-      values.push(cityClean, cityPadded);
-      index += 2;
+
+      where.city = {
+        in: [cityClean, cityPadded],
+      };
     }
 
     if (district && district !== 'undefined' && district !== '') {
       const distClean = String(district).trim();
-      query += ` AND TRIM(r.district) = $${index++}`;
-      values.push(distClean);
+
+      where.district = distClean;
     }
 
     if (minPrice !== undefined && minPrice !== '' && !isNaN(Number(minPrice))) {
-      query += ` AND r.price >= $${index++}`;
-      values.push(Number(minPrice));
+      where.price = {
+        gte: Number(minPrice),
+      };
     }
+
     if (maxPrice !== undefined && maxPrice !== '' && !isNaN(Number(maxPrice))) {
-      query += ` AND r.price <= $${index++}`;
-      values.push(Number(maxPrice));
+      where.price = {
+        ...(where.price || {}),
+        lte: Number(maxPrice),
+      };
     }
 
     if (minArea !== undefined && minArea !== '' && !isNaN(Number(minArea))) {
-      query += ` AND r.area >= $${index++}`;
-      values.push(Number(minArea));
-    }
-    if (maxArea !== undefined && maxArea !== '' && !isNaN(Number(maxArea))) {
-      query += ` AND r.area <= $${index++}`;
-      values.push(Number(maxArea));
-    }
-
-    query += ` ORDER BY r.id DESC`;
-
-    try {
-      const result = await this.pool.query(query, values);
-      return {
-        total: result.rows.length,
-        data: result.rows,
+      where.area = {
+        gte: Number(minArea),
       };
-    } catch (error) {
-      console.error('❌ [SQL ERROR]:', error);
-      throw error;
     }
+
+    if (maxArea !== undefined && maxArea !== '' && !isNaN(Number(maxArea))) {
+      where.area = {
+        ...(where.area || {}),
+        lte: Number(maxArea),
+      };
+    }
+
+    const rooms = await this.prisma.rooms.findMany({
+      where,
+      include: {
+        provinces: true,
+        districts: true,
+        user: true,
+      },
+      orderBy: {
+        id: 'desc',
+      },
+    });
+
+    const data = rooms.map((room) => ({
+      ...room,
+      city_name: room.provinces?.name ?? null,
+      district_name: room.districts?.name ?? null,
+      user: room.user
+        ? {
+            id: room.user.id,
+            full_name: room.user.full_name,
+            phone: room.user.phone,
+            avatar: room.user.avatar,
+            is_verified: room.user.is_active,
+          }
+        : null,
+    }));
+
+    return {
+      total: data.length,
+      data,
+    };
   }
 
   // 2. LẤY CHI TIẾT 1 PHÒNG TRỌ (Sử dụng Prisma)
@@ -250,7 +255,7 @@ export class RoomsService {
   // 3. TẠO PHÒNG TRỌ MỚI (Trạng thái mặc định là pending chờ duyệt)
   async createRoom(dto: CreateRoomDto, userId?: number) {
     const { title, price, area, city, district, content, thumbnail, images, amenities } = dto;
-    
+
     if (
       !title ||
       price === undefined ||
@@ -273,7 +278,7 @@ export class RoomsService {
         area,
         city,
         district,
-        content || null, // Chú ý: Dùng cột content như trong DB thay vì description để tránh lỗi
+        content || null,
         thumbnail || null,
         JSON.stringify(images || []),
         JSON.stringify(amenities || []),
@@ -385,7 +390,7 @@ export class RoomsService {
       ...oldRoom,
       ...dto,
     };
-    
+
     const finalImagesUpdate = images ? JSON.stringify(images) : '[]';
     const finalAmenitiesUpdate = amenities ? JSON.stringify(amenities) : '[]';
 
@@ -457,7 +462,7 @@ export class RoomsService {
     try {
       const updatedRoom = await this.prisma.rooms.update({
         where: { id: Number(id) },
-        data: { status: status as any },
+        data: { status: status as RoomStatus },
       });
 
       return {
