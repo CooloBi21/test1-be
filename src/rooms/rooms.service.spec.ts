@@ -284,5 +284,38 @@ describe('RoomsService', () => {
         [20, 50],
       );
     });
+
+    it('should preserve room response mapping from database result', async () => {
+      const mockRooms = [
+        {
+          id: 10,
+          title: 'Phòng trọ test',
+          price: 2500000,
+          area: 25,
+          city: '79',
+          district: '760',
+          city_name: 'TP. Hồ Chí Minh',
+          district_name: 'Quận 1',
+          user: {
+            id: 5,
+            full_name: 'Nguyễn Văn Test',
+            phone: '0123456789',
+            avatar: 'avatar.jpg',
+            is_verified: true,
+          },
+        },
+      ];
+
+      mockPool.query.mockResolvedValue({
+        rows: mockRooms,
+      });
+
+      const result = await service.getRooms({});
+
+      expect(result).toEqual({
+        total: 1,
+        data: mockRooms,
+      });
+    });
   });
 });
