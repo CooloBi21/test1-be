@@ -490,4 +490,118 @@ describe('RoomsService', () => {
       });
     });
   });
+
+  describe('findAllForAdmin', () => {
+    it('should return all rooms with city, district and user information', async () => {
+      const mockRooms = [
+        {
+          id: 2,
+          title: 'Phòng trọ 2',
+          price: 3000000,
+          area: 25,
+          city: '79',
+          district: '760',
+          status: RoomStatus.pending,
+          provinces: {
+            name: 'TP. Hồ Chí Minh',
+          },
+          districts: {
+            name: 'Quận 1',
+          },
+          user: {
+            id: 5,
+            full_name: 'Nguyễn Văn Test',
+            email: 'test@example.com',
+            phone: '0123456789',
+            avatar: 'avatar.jpg',
+          },
+        },
+        {
+          id: 1,
+          title: 'Phòng trọ 1',
+          price: 2500000,
+          area: 20,
+          city: '79',
+          district: '760',
+          status: RoomStatus.approved,
+          provinces: {
+            name: 'TP. Hồ Chí Minh',
+          },
+          districts: {
+            name: 'Quận 1',
+          },
+          user: null,
+        },
+      ];
+
+      mockPrisma.rooms.findMany.mockResolvedValue(mockRooms);
+
+      const result = await service.findAllForAdmin();
+
+      expect(result).toEqual({
+        total: 2,
+        data: [
+          {
+            ...mockRooms[0],
+            city_name: 'TP. Hồ Chí Minh',
+            district_name: 'Quận 1',
+            user: {
+              id: 5,
+              full_name: 'Nguyễn Văn Test',
+              email: 'test@example.com',
+              phone: '0123456789',
+              avatar: 'avatar.jpg',
+            },
+          },
+          {
+            ...mockRooms[1],
+            city_name: 'TP. Hồ Chí Minh',
+            district_name: 'Quận 1',
+            user: null,
+          },
+        ],
+      });
+
+      expect(mockPrisma.rooms.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('should prioritize pending rooms before approved and rejected rooms', async () => {
+      const mockRooms = [
+        {
+          id: 10,
+          title: 'Phòng rejected',
+          status: RoomStatus.rejected,
+          provinces: null,
+          districts: null,
+          user: null,
+        },
+        {
+          id: 20,
+          title: 'Phòng approved',
+          status: RoomStatus.approved,
+          provinces: null,
+          districts: null,
+          user: null,
+        },
+        {
+          id: 30,
+          title: 'Phòng pending',
+          status: RoomStatus.pending,
+          provinces: null,
+          districts: null,
+          user: null,
+        },
+      ];
+
+      mockPrisma.rooms.findMany.mockResolvedValue(mockRooms);
+
+      const result = await service.findAllForAdmin();
+
+      expect(result.data.map((room) => room.status)).toEqual([
+        RoomStatus.pending,
+        RoomStatus.approved,
+        RoomStatus.rejected,
+      ]);
+    });
+  });
 });

@@ -217,38 +217,48 @@ export class RoomsService {
 
   // 2b. LẤY TẤT CẢ PHÒNG CHO ADMIN (mọi trạng thái, ưu tiên chờ duyệt)
   async findAllForAdmin() {
-    const result = await this.pool.query(
-      `
-      SELECT 
-        r.*, 
-        p.name AS city_name, 
-        d.name AS district_name,
-        CASE WHEN u.id IS NOT NULL THEN
-          json_build_object(
-            'id', u.id,
-            'full_name', u.full_name,
-            'email', u.email,
-            'phone', u.phone,
-            'avatar', u.avatar
-          )
-        ELSE NULL END AS user
-      FROM rooms r
-      LEFT JOIN provinces p ON TRIM(r.city) = TRIM(p.code)
-      LEFT JOIN districts d ON TRIM(r.district) = TRIM(d.code)
-      LEFT JOIN users u ON r.user_id = u.id
-      ORDER BY 
-        CASE r.status 
-          WHEN 'pending' THEN 0 
-          WHEN 'approved' THEN 1 
-          ELSE 2 
-        END,
-        r.id DESC
-      `,
+    const rooms = await this.prisma.rooms.findMany({
+      include: {
+        provinces: true,
+        districts: true,
+        user: true,
+      },
+      orderBy: {
+        id: 'desc',
+      },
+    });
+
+    const statusPriority = {
+      pending: 0,
+      approved: 1,
+      rejected: 2,
+    };
+
+    const sortedRooms = rooms.sort(
+      (a, b) =>
+        (statusPriority[a.status ?? 'rejected'] ?? 2) -
+          (statusPriority[b.status ?? 'rejected'] ?? 2) ||
+        b.id - a.id,
     );
 
+    const data = sortedRooms.map((room) => ({
+      ...room,
+      city_name: room.provinces?.name ?? null,
+      district_name: room.districts?.name ?? null,
+      user: room.user
+        ? {
+            id: room.user.id,
+            full_name: room.user.full_name,
+            email: room.user.email,
+            phone: room.user.phone,
+            avatar: room.user.avatar,
+          }
+        : null,
+    }));
+
     return {
-      total: result.rows.length,
-      data: result.rows,
+      total: data.length,
+      data,
     };
   }
 
