@@ -4,7 +4,8 @@ import {
   IsNotEmpty, 
   IsNumber, 
   IsOptional, 
-  IsArray 
+  IsArray,
+  IsPositive
 } from 'class-validator';
 
 export class CreateRoomDto {
@@ -20,11 +21,13 @@ export class CreateRoomDto {
 
   @ApiProperty({ description: 'Giá phòng (VNĐ)' })
   @IsNumber()
+  @IsPositive({ message: 'Giá phòng phải lớn hơn 0' })
   @IsNotEmpty({ message: 'Giá phòng không được để trống' })
   price: number;
 
   @ApiProperty({ description: 'Diện tích (m²)' })
   @IsNumber()
+  @IsPositive({ message: 'Diện tích phải lớn hơn 0' })
   @IsNotEmpty({ message: 'Diện tích không được để trống' })
   area: number;
 
