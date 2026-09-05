@@ -262,9 +262,19 @@ export class RoomsService {
     };
   }
 
-  // 3. TẠO PHÒNG TRỌ MỚI (Trạng thái mặc định là pending chờ duyệt)
+  // 3. TẠO PHÒNG TRỌ MỚI (Trạng thái mặc định là pending chờ duyệt - Sử dụng Prisma)
   async createRoom(dto: CreateRoomDto, userId?: number) {
-    const { title, price, area, city, district, content, thumbnail, images, amenities } = dto;
+    const {
+      title,
+      price,
+      area,
+      city,
+      district,
+      content,
+      thumbnail,
+      images,
+      amenities,
+    } = dto;
 
     if (
       !title ||
@@ -276,27 +286,23 @@ export class RoomsService {
       throw new BadRequestException('Thiếu thông tin bắt buộc');
     }
 
-    const result = await this.pool.query(
-      `
-      INSERT INTO rooms (title, price, area, city, district, content, thumbnail, images, amenities, user_id, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
-      RETURNING *
-      `,
-      [
+    const room = await this.prisma.rooms.create({
+      data: {
         title,
         price,
         area,
         city,
         district,
-        content || null,
-        thumbnail || null,
-        JSON.stringify(images || []),
-        JSON.stringify(amenities || []),
-        userId || null,
-      ]
-    );
+        content: content || null,
+        thumbnail: thumbnail || null,
+        images: images || [],
+        amenities: amenities || [],
+        user_id: userId || null,
+        status: RoomStatus.pending,
+      },
+    });
 
-    return result.rows[0];
+    return room;
   }
 
   // 4. CẬP NHẬT PHÒNG TRỌ (Kiểm tra chính chủ + Diff chuẩn hóa + Thông báo thông minh)

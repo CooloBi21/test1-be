@@ -1,5 +1,5 @@
 // src/rooms/rooms.service.spec.ts
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RoomStatus } from '@prisma/client';
 import { RoomsService } from './rooms.service';
 
@@ -14,6 +14,7 @@ describe('RoomsService', () => {
     rooms: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
+      create: jest.fn(),
     },
   };
 
@@ -602,6 +603,117 @@ describe('RoomsService', () => {
         RoomStatus.approved,
         RoomStatus.rejected,
       ]);
+    });
+  });
+
+  describe('createRoom', () => {
+    it('should throw BadRequestException when required fields are missing', async () => {
+      const invalidDto = {
+        title: 'Phòng trọ test',
+        // thiếu price, area, city, district
+      };
+
+      await expect(service.createRoom(invalidDto as any, 5)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should create a room with the provided data', async () => {
+      const mockRoom = {
+        id: 123,
+        title: 'Phòng trọ test',
+        price: 3000000,
+        area: 25,
+        city: '79',
+        district: '760',
+        content: 'Phòng đầy đủ tiện nghi',
+        thumbnail: 'thumbnail.jpg',
+        images: ['image1.jpg', 'image2.jpg'],
+        amenities: ['wifi', 'parking'],
+        user_id: 5,
+        status: RoomStatus.pending,
+      };
+
+      mockPrisma.rooms.create.mockResolvedValue(mockRoom);
+
+      const dto = {
+        title: 'Phòng trọ test',
+        price: 3000000,
+        area: 25,
+        city: '79',
+        district: '760',
+        content: 'Phòng đầy đủ tiện nghi',
+        thumbnail: 'thumbnail.jpg',
+        images: ['image1.jpg', 'image2.jpg'],
+        amenities: ['wifi', 'parking'],
+      };
+
+      const result = await service.createRoom(dto as any, 5);
+
+      expect(result).toEqual(mockRoom);
+
+      expect(mockPrisma.rooms.create).toHaveBeenCalledWith({
+        data: {
+          title: 'Phòng trọ test',
+          price: 3000000,
+          area: 25,
+          city: '79',
+          district: '760',
+          content: 'Phòng đầy đủ tiện nghi',
+          thumbnail: 'thumbnail.jpg',
+          images: ['image1.jpg', 'image2.jpg'],
+          amenities: ['wifi', 'parking'],
+          user_id: 5,
+          status: RoomStatus.pending,
+        },
+      });
+    });
+
+    it('should set default values for optional fields when not provided', async () => {
+      const mockRoom = {
+        id: 124,
+        title: 'Phòng tối giản',
+        price: 2000000,
+        area: 20,
+        city: '79',
+        district: '760',
+        content: null,
+        thumbnail: null,
+        images: [],
+        amenities: [],
+        user_id: null,
+        status: RoomStatus.pending,
+      };
+
+      mockPrisma.rooms.create.mockResolvedValue(mockRoom);
+
+      const dto = {
+        title: 'Phòng tối giản',
+        price: 2000000,
+        area: 20,
+        city: '79',
+        district: '760',
+      };
+
+      const result = await service.createRoom(dto as any);
+
+      expect(result).toEqual(mockRoom);
+
+      expect(mockPrisma.rooms.create).toHaveBeenCalledWith({
+        data: {
+          title: 'Phòng tối giản',
+          price: 2000000,
+          area: 20,
+          city: '79',
+          district: '760',
+          content: null,
+          thumbnail: null,
+          images: [],
+          amenities: [],
+          user_id: null,
+          status: RoomStatus.pending,
+        },
+      });
     });
   });
 });
