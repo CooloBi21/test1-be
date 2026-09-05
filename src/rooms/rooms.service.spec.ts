@@ -1,5 +1,9 @@
 // src/rooms/rooms.service.spec.ts
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { RoomStatus } from '@prisma/client';
 import { RoomsService } from './rooms.service';
 
@@ -15,6 +19,9 @@ describe('RoomsService', () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
+    },
+    saved_posts: {
+      findMany: jest.fn(),
     },
   };
 
@@ -714,6 +721,150 @@ describe('RoomsService', () => {
           status: RoomStatus.pending,
         },
       });
+    });
+  });
+
+  describe('updateRoom', () => {
+    it('should throw NotFoundException when room does not exist', async () => {
+      mockPool.query.mockResolvedValueOnce({
+        rows: [],
+      });
+
+      const dto = {
+        title: 'Phòng mới',
+      };
+
+      await expect(
+        service.updateRoom('123', dto as any, 5),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        'SELECT * FROM rooms WHERE id = $1',
+        ['123'],
+      );
+    });
+
+    it('should throw ForbiddenException when user is not the room owner', async () => {
+      mockPool.query.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 123,
+            user_id: 10,
+            title: 'Phòng cũ',
+          },
+        ],
+      });
+
+      const dto = {
+        title: 'Phòng mới',
+      };
+
+      await expect(
+        service.updateRoom('123', dto as any, 5),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        'SELECT * FROM rooms WHERE id = $1',
+        ['123'],
+      );
+    });
+
+    it('should update room and return changed fields', async () => {
+      const oldRoom = {
+        id: 123,
+        user_id: 5,
+        title: 'Phòng cũ',
+        price: 2000000,
+        area: 20,
+        city: '79',
+        district: '760',
+        content: 'Nội dung cũ',
+        thumbnail: 'old.jpg',
+        images: ['old-image.jpg'],
+        amenities: ['wifi'],
+      };
+
+      const updatedRoom = {
+        ...oldRoom,
+        title: 'Phòng mới',
+        price: 2500000,
+        thumbnail: 'new.jpg',
+      };
+
+      mockPool.query
+        .mockResolvedValueOnce({
+          rows: [oldRoom],
+        })
+        .mockResolvedValueOnce({
+          rows: [updatedRoom],
+        });
+
+      mockPrisma.saved_posts.findMany.mockResolvedValue([]);
+
+      const dto = {
+        title: 'Phòng mới',
+        price: 2500000,
+        thumbnail: 'new.jpg',
+      };
+
+      const result = await service.updateRoom('123', dto as any, 5);
+
+      expect(result).toEqual({
+        data: updatedRoom,
+        changes: [
+          {
+            field: 'price',
+            oldValue: 2000000,
+            newValue: 2500000,
+          },
+          {
+            field: 'title',
+            oldValue: 'Phòng cũ',
+            newValue: 'Phòng mới',
+          },
+          {
+            field: 'thumbnail',
+            oldValue: 'old.jpg',
+            newValue: 'new.jpg',
+          },
+        ],
+      });
+
+      expect(mockPool.query).toHaveBeenCalledTimes(2);
+    });
+
+    it('should return old room without updating when no fields change', async () => {
+      const oldRoom = {
+        id: 123,
+        user_id: 5,
+        title: 'Phòng cũ',
+        price: 2000000,
+        area: 20,
+        city: '79',
+        district: '760',
+        content: 'Nội dung cũ',
+        thumbnail: 'old.jpg',
+        images: ['old-image.jpg'],
+        amenities: ['wifi'],
+      };
+
+      mockPool.query.mockResolvedValueOnce({
+        rows: [oldRoom],
+      });
+
+      const dto = {
+        title: 'Phòng cũ',
+        price: 2000000,
+      };
+
+      const result = await service.updateRoom('123', dto as any, 5);
+
+      expect(result).toEqual({
+        data: oldRoom,
+        changes: [],
+      });
+
+      expect(mockPool.query).toHaveBeenCalledTimes(1);
     });
   });
 });
