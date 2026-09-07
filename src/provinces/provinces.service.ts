@@ -1,6 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { Pool } from 'pg';
-import { DATABASE_POOL } from '../database/database.module';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface ProvinceRow {
   code: string;
@@ -9,14 +8,17 @@ export interface ProvinceRow {
 
 @Injectable()
 export class ProvincesService {
-  constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getAllProvinces(): Promise<ProvinceRow[]> {
-    const result = await this.pool.query<ProvinceRow>(`
-      SELECT code, name
-      FROM provinces
-      ORDER BY name
-    `);
-    return result.rows;
+    return this.prisma.provinces.findMany({
+      select: {
+        code: true,
+        name: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
   }
 }
