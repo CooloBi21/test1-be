@@ -19,6 +19,7 @@ describe('RoomsService', () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
     },
     saved_posts: {
       findMany: jest.fn(),
@@ -730,6 +731,10 @@ describe('RoomsService', () => {
 
       const dto = {
         title: 'Phòng mới',
+        price: 2000000,
+        area: 20,
+        city: '01',
+        district: '001',
       };
 
       await expect(
@@ -750,6 +755,10 @@ describe('RoomsService', () => {
 
       const dto = {
         title: 'Phòng mới',
+        price: 2000000,
+        area: 20,
+        city: '01',
+        district: '001',
       };
 
       await expect(
@@ -784,9 +793,7 @@ describe('RoomsService', () => {
       };
 
       mockPrisma.rooms.findUnique.mockResolvedValueOnce(oldRoom);
-      mockPool.query.mockResolvedValueOnce({
-        rows: [updatedRoom],
-      });
+      mockPrisma.rooms.update.mockResolvedValueOnce(updatedRoom);
       mockPrisma.saved_posts.findMany.mockResolvedValue([]);
 
       const dto = {
@@ -818,7 +825,22 @@ describe('RoomsService', () => {
         ],
       });
 
-      expect(mockPool.query).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.rooms.update).toHaveBeenCalledWith({
+        where: {
+          id: 123,
+        },
+        data: {
+          title: 'Phòng mới',
+          price: 2500000,
+          area: 20,
+          city: '79',
+          district: '760',
+          content: 'Nội dung cũ',
+          thumbnail: 'new.jpg',
+          images: ['old-image.jpg'],
+          amenities: ['wifi'],
+        },
+      });
     });
 
     it('should return old room without updating when no fields change', async () => {
@@ -850,7 +872,10 @@ describe('RoomsService', () => {
         changes: [],
       });
 
-      expect(mockPool.query).not.toHaveBeenCalled();
+      expect(mockPrisma.rooms.findUnique).toHaveBeenCalledWith({
+        where: { id: 123 },
+      });
+      expect(mockPrisma.rooms.update).not.toHaveBeenCalled();
     });
   });
 });

@@ -407,30 +407,22 @@ export class RoomsService {
       ...dto,
     };
 
-    const finalImagesUpdate = images ? JSON.stringify(images) : '[]';
-    const finalAmenitiesUpdate = amenities ? JSON.stringify(amenities) : '[]';
-
-    const result = await this.pool.query(
-      `
-      UPDATE rooms
-      SET title = $1, thumbnail = $2, price = $3, area = $4, city = $5, district = $6, content = $7, images = $8, amenities = $9
-      WHERE id = $10
-      RETURNING *
-      `,
-      [
+    const updatedRoom = await this.prisma.rooms.update({
+      where: {
+        id: Number(id),
+      },
+      data: {
         title,
-        thumbnail || null,
+        thumbnail: thumbnail || null,
         price,
         area,
         city,
         district,
-        content || null,
-        finalImagesUpdate,
-        finalAmenitiesUpdate,
-        id,
-      ],
-    );
-    const updatedRoom = result.rows[0];
+        content: content || null,
+        images: images || [],
+        amenities: amenities || [],
+      },
+    });
 
     // 4.5. Tạo Notification thông minh dựa trên danh sách thay đổi thực sự
     const savedUsers = await this.prisma.saved_posts.findMany({
