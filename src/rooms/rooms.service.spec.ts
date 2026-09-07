@@ -1,4 +1,3 @@
-// src/rooms/rooms.service.spec.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -12,21 +11,39 @@ describe('RoomsService', () => {
 
   const mockPool = {
     query: jest.fn(),
+    connect: jest.fn(),
   };
 
   const mockPrisma = {
+    $transaction: jest.fn(),
     rooms: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
     saved_posts: {
       findMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    room_views: {
+      deleteMany: jest.fn(),
+    },
+    reviews: {
+      deleteMany: jest.fn(),
+    },
+    reports: {
+      deleteMany: jest.fn(),
+    },
+    conversations: {
+      updateMany: jest.fn(),
     },
   };
 
-  const mockNotificationsService = {};
+  const mockNotificationsService = {
+    createNotification: jest.fn(),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -36,6 +53,118 @@ describe('RoomsService', () => {
       mockPrisma as any,
       mockNotificationsService as any,
     );
+  });
+
+  describe('deleteRoom', () => {
+    it('should throw NotFoundException when room does not exist', async () => {
+      mockPrisma.rooms.findUnique.mockResolvedValueOnce(null);
+
+      await expect(service.deleteRoom('999', 1)).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(mockPrisma.rooms.findUnique).toHaveBeenCalledWith({
+        where: {
+          id: 999,
+        },
+      });
+    });
+
+    it('should throw ForbiddenException when current user is not the room owner', async () => {
+      mockPrisma.rooms.findUnique.mockResolvedValueOnce({
+        id: 123,
+        user_id: 10,
+        title: 'Phòng test',
+      });
+
+      await expect(service.deleteRoom('123', 20)).rejects.toThrow(
+        ForbiddenException,
+      );
+
+      expect(mockPrisma.rooms.findUnique).toHaveBeenCalledWith({
+        where: {
+          id: 123,
+        },
+      });
+
+      expect(mockPool.connect).not.toHaveBeenCalled();
+    });
+
+    it('should delete room and related data successfully', async () => {
+      mockPrisma.rooms.findUnique.mockResolvedValueOnce({
+        id: 123,
+        user_id: 10,
+        title: 'Phòng test',
+      });
+
+      mockPrisma.saved_posts.findMany.mockResolvedValue([
+        { user_id: 20 },
+        { user_id: 10 },
+      ]);
+
+      mockPrisma.saved_posts.deleteMany.mockResolvedValue({ count: 2 });
+      mockPrisma.room_views.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.reviews.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.reports.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.conversations.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.rooms.delete.mockResolvedValue({
+        id: 123,
+        user_id: 10,
+        title: 'Phòng test',
+      });
+      mockPrisma.$transaction.mockImplementation(async (callback) => {
+        return callback(mockPrisma as any);
+      });
+
+      const result = await service.deleteRoom('123', 10);
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+
+      expect(mockPrisma.saved_posts.deleteMany).toHaveBeenCalledWith({
+        where: { room_id: 123 },
+      });
+      expect(mockPrisma.room_views.deleteMany).toHaveBeenCalledWith({
+        where: { room_id: 123 },
+      });
+      expect(mockPrisma.reviews.deleteMany).toHaveBeenCalledWith({
+        where: { room_id: 123 },
+      });
+      expect(mockPrisma.reports.deleteMany).toHaveBeenCalledWith({
+        where: { room_id: 123 },
+      });
+      expect(mockPrisma.conversations.updateMany).toHaveBeenCalledWith({
+        where: { room_id: 123 },
+        data: { room_id: null },
+      });
+      expect(mockPrisma.rooms.delete).toHaveBeenCalledWith({
+        where: { id: 123 },
+      });
+
+      expect(result).toEqual({
+        message: 'Xóa phòng thành công',
+        data: {
+          id: 123,
+          user_id: 10,
+          title: 'Phòng test',
+        },
+      });
+
+      expect(
+        mockNotificationsService.createNotification,
+      ).toHaveBeenCalledTimes(1);
+
+      expect(
+        mockNotificationsService.createNotification,
+      ).toHaveBeenCalledWith({
+        user_id: 20,
+        type: 'saved_room_updated',
+        title: 'Tin đã lưu đã bị gỡ',
+        body: 'Phòng "Phòng test" mà bạn đã lưu vừa bị chủ nhà xóa/gỡ khỏi hệ thống.',
+        target_url: '/saved-posts',
+        entity_type: 'room',
+        entity_id: 123,
+      });
+    });
   });
 
   describe('getRoomById', () => {

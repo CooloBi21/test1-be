@@ -487,18 +487,17 @@ export class RoomsService {
 
   // 6. XÓA PHÒNG TRỌ (Kiểm tra chính chủ + Thông báo bài đăng bị gỡ)
   async deleteRoom(id: string, currentUserId: number) {
-    // 6.1. Kiểm tra tồn tại
-    const roomCheck = await this.pool.query(
-      `SELECT * FROM rooms WHERE id = $1`,
-      [id],
-    );
-    if (roomCheck.rows.length === 0) {
+    // 6.1. Kiểm tra tồn tại và chính chủ bằng Prisma
+    const roomData = await this.prisma.rooms.findUnique({
+      where: {
+        id: Number(id),
+      },
+    });
+
+    if (!roomData) {
       throw new NotFoundException('Không tìm thấy phòng');
     }
 
-    const roomData = roomCheck.rows[0];
-
-    // 6.2. Kiểm tra chính chủ
     if (Number(roomData.user_id) !== Number(currentUserId)) {
       throw new ForbiddenException('Bạn không có quyền xóa bài đăng này');
     }
@@ -509,30 +508,48 @@ export class RoomsService {
       select: { user_id: true },
     });
 
-    // 6.4. Xóa bài đăng khỏi Database
-    const client = await this.pool.connect();
-    let deletedRoom: any;
+    // 6.4. Xóa bài đăng khỏi Database bằng Prisma Transaction
+    const roomId = Number(id);
+    const deletedRoom = await this.prisma.$transaction(async (tx) => {
+      await tx.saved_posts.deleteMany({
+        where: {
+          room_id: roomId,
+        },
+      });
 
-    try {
-      await client.query('BEGIN');
-      await client.query(`DELETE FROM saved_posts WHERE room_id = $1`, [id]);
-      await client.query(`DELETE FROM room_views WHERE room_id = $1`, [id]);
-      await client.query(`DELETE FROM reviews WHERE room_id = $1`, [id]);
-      await client.query(`DELETE FROM reports WHERE room_id = $1`, [id]);
-      await client.query(`UPDATE conversations SET room_id = NULL WHERE room_id = $1`, [id]);
+      await tx.room_views.deleteMany({
+        where: {
+          room_id: roomId,
+        },
+      });
 
-      const result = await client.query(
-        `DELETE FROM rooms WHERE id = $1 RETURNING *`,
-        [id],
-      );
-      deletedRoom = result.rows[0];
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+      await tx.reviews.deleteMany({
+        where: {
+          room_id: roomId,
+        },
+      });
+
+      await tx.reports.deleteMany({
+        where: {
+          room_id: roomId,
+        },
+      });
+
+      await tx.conversations.updateMany({
+        where: {
+          room_id: roomId,
+        },
+        data: {
+          room_id: null,
+        },
+      });
+
+      return tx.rooms.delete({
+        where: {
+          id: roomId,
+        },
+      });
+    });
 
     // 6.5. Báo cho người dùng đã lưu phòng biết tin bị gỡ
     for (const item of savedUsers) {
