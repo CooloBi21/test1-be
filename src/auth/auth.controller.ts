@@ -6,9 +6,11 @@ import {
   Put,
   Query,
   Request,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
 
 import { AuthService } from './auth.service';
 import {
@@ -32,8 +34,34 @@ export class AuthController {
 
   // POST /auth/login
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(dto);
+
+    res.cookie('access_token', result.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return result;
+  }
+
+  // POST /auth/logout
+  @Post('logout')
+  logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie('access_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    });
+
+    return {
+      message: 'Đăng xuất thành công',
+    };
   }
 
   // POST /auth/google (Xác thực idToken từ Google Client)
@@ -42,7 +70,7 @@ export class AuthController {
     return this.authService.googleLogin(dto.token);
   }
 
-  // GET /auth/profile (Yêu cầu Bearer Token ở Header)
+  // GET /auth/profile (Yêu cầu Bearer Token hoặc Cookie)
   @UseGuards(AuthGuard('jwt'))
   @Get('profile')
   getProfile(@Request() req: any) {
