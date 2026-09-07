@@ -307,16 +307,16 @@ export class RoomsService {
 
   // 4. CẬP NHẬT PHÒNG TRỌ (Kiểm tra chính chủ + Diff chuẩn hóa + Thông báo thông minh)
   async updateRoom(id: string, dto: UpdateRoomDto, currentUserId: number) {
-    // 4.1. Lấy room hiện tại
-    const roomCheck = await this.pool.query(
-      `SELECT * FROM rooms WHERE id = $1`,
-      [id],
-    );
-    if (roomCheck.rows.length === 0) {
+    // 4.1. Lấy room hiện tại bằng Prisma
+    const oldRoom = await this.prisma.rooms.findUnique({
+      where: {
+        id: Number(id),
+      },
+    });
+
+    if (!oldRoom) {
       throw new NotFoundException('Không tìm thấy phòng');
     }
-
-    const oldRoom = roomCheck.rows[0];
 
     // 4.2. Kiểm tra quyền sở hữu bài đăng
     if (Number(oldRoom.user_id) !== Number(currentUserId)) {

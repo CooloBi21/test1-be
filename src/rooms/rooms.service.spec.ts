@@ -726,9 +726,7 @@ describe('RoomsService', () => {
 
   describe('updateRoom', () => {
     it('should throw NotFoundException when room does not exist', async () => {
-      mockPool.query.mockResolvedValueOnce({
-        rows: [],
-      });
+      mockPrisma.rooms.findUnique.mockResolvedValueOnce(null);
 
       const dto = {
         title: 'Phòng mới',
@@ -738,21 +736,16 @@ describe('RoomsService', () => {
         service.updateRoom('123', dto as any, 5),
       ).rejects.toThrow(NotFoundException);
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        'SELECT * FROM rooms WHERE id = $1',
-        ['123'],
-      );
+      expect(mockPrisma.rooms.findUnique).toHaveBeenCalledWith({
+        where: { id: 123 },
+      });
     });
 
     it('should throw ForbiddenException when user is not the room owner', async () => {
-      mockPool.query.mockResolvedValueOnce({
-        rows: [
-          {
-            id: 123,
-            user_id: 10,
-            title: 'Phòng cũ',
-          },
-        ],
+      mockPrisma.rooms.findUnique.mockResolvedValueOnce({
+        id: 123,
+        user_id: 10,
+        title: 'Phòng cũ',
       });
 
       const dto = {
@@ -763,10 +756,9 @@ describe('RoomsService', () => {
         service.updateRoom('123', dto as any, 5),
       ).rejects.toThrow(ForbiddenException);
 
-      expect(mockPool.query).toHaveBeenCalledWith(
-        'SELECT * FROM rooms WHERE id = $1',
-        ['123'],
-      );
+      expect(mockPrisma.rooms.findUnique).toHaveBeenCalledWith({
+        where: { id: 123 },
+      });
     });
 
     it('should update room and return changed fields', async () => {
@@ -791,14 +783,10 @@ describe('RoomsService', () => {
         thumbnail: 'new.jpg',
       };
 
-      mockPool.query
-        .mockResolvedValueOnce({
-          rows: [oldRoom],
-        })
-        .mockResolvedValueOnce({
-          rows: [updatedRoom],
-        });
-
+      mockPrisma.rooms.findUnique.mockResolvedValueOnce(oldRoom);
+      mockPool.query.mockResolvedValueOnce({
+        rows: [updatedRoom],
+      });
       mockPrisma.saved_posts.findMany.mockResolvedValue([]);
 
       const dto = {
@@ -830,7 +818,7 @@ describe('RoomsService', () => {
         ],
       });
 
-      expect(mockPool.query).toHaveBeenCalledTimes(2);
+      expect(mockPool.query).toHaveBeenCalledTimes(1);
     });
 
     it('should return old room without updating when no fields change', async () => {
@@ -848,9 +836,7 @@ describe('RoomsService', () => {
         amenities: ['wifi'],
       };
 
-      mockPool.query.mockResolvedValueOnce({
-        rows: [oldRoom],
-      });
+      mockPrisma.rooms.findUnique.mockResolvedValueOnce(oldRoom);
 
       const dto = {
         title: 'Phòng cũ',
@@ -864,7 +850,7 @@ describe('RoomsService', () => {
         changes: [],
       });
 
-      expect(mockPool.query).toHaveBeenCalledTimes(1);
+      expect(mockPool.query).not.toHaveBeenCalled();
     });
   });
 });
