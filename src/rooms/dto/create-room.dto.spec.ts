@@ -66,4 +66,26 @@ describe('CreateRoomDto', () => {
 
     expect(errors.some((error) => error.property === 'area')).toBe(true);
   });
+
+  it('should reject city longer than 20 characters', async () => {
+    const dto = plainToInstance(CreateRoomDto, {
+      ...createValidDto(),
+      city: '123456789012345678901',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'city')).toBe(true);
+  });
+
+  it('should reject district longer than 20 characters', async () => {
+    const dto = plainToInstance(CreateRoomDto, {
+      ...createValidDto(),
+      district: '123456789012345678901',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.some((error) => error.property === 'district')).toBe(true);
+  });
 });
