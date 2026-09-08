@@ -5,7 +5,8 @@ import {
   IsNumber, 
   IsOptional, 
   IsArray,
-  IsPositive
+  IsPositive,
+  MaxLength,
 } from 'class-validator';
 
 export class CreateRoomDto {
@@ -34,11 +35,13 @@ export class CreateRoomDto {
   @ApiProperty({ description: 'Mã tỉnh thành' })
   @IsString()
   @IsNotEmpty({ message: 'Mã tỉnh thành không được để trống' })
+  @MaxLength(20, { message: 'Mã tỉnh thành không được vượt quá 20 ký tự' })
   city: string;
 
   @ApiProperty({ description: 'Mã quận huyện' })
   @IsString()
   @IsNotEmpty({ message: 'Mã quận huyện không được để trống' })
+  @MaxLength(20, { message: 'Mã quận huyện không được vượt quá 20 ký tự' })
   district: string;
 
   @ApiPropertyOptional({ description: 'Nội dung chi tiết' })
