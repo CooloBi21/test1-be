@@ -66,8 +66,20 @@ export class AuthController {
 
   // POST /auth/google (Xác thực idToken từ Google Client)
   @Post('google')
-  googleLogin(@Body() dto: GoogleLoginDto) {
-    return this.authService.googleLogin(dto.token);
+  async googleLogin(
+    @Body() dto: GoogleLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.googleLogin(dto.token);
+
+    res.cookie('access_token', result.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return result;
   }
 
   // GET /auth/profile (Yêu cầu Bearer Token hoặc Cookie)
