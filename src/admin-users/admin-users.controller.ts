@@ -2,20 +2,24 @@ import { Controller, Get, Patch, Param, Body, UseGuards, ParseIntPipe, Query, Re
 import { AdminUsersService } from './admin-users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Roles('admin')
 @Controller('api/admin/users')
 export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}
 
   @Get()
+  @Permissions('user.read')
   async getUsers(@Query('role') role?: string) {
     return this.adminUsersService.getAllUsers(role);
   }
 
   @Patch(':id/role')
+  @Permissions('user.role.update')
   async updateUserRole(
     @Req() req: any,
     @Param('id', ParseIntPipe) id: number,
