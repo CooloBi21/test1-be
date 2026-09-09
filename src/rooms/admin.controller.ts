@@ -40,8 +40,9 @@ export class AdminController {
   }
 
   @Put('rooms/:id/status')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin')
+  @Permissions('room.status.update')
   @ApiBody({ type: UpdateRoomStatusDto })
   async updateRoomStatus(
     @Param('id', ParseIntPipe) id: number, 
