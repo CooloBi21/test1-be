@@ -32,8 +32,9 @@ export class ReportsController {
   }
 
   // Admin xử lý báo cáo (Khóa/Bỏ qua)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin')
+  @Permissions('report.status.update')
   @ApiBearerAuth()
   @Patch('admin/:id/status')
   async updateStatus(
