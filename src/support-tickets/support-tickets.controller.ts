@@ -30,8 +30,9 @@ export class SupportTicketsController {
     return this.ticketsService.getAdminTickets(status);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin')
+  @Permissions('support.update')
   @Patch('admin/:id')
   async replyTicket(
     @Param('id', ParseIntPipe) id: number,
