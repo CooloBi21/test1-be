@@ -1,4 +1,9 @@
-import { BadRequestException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  UnauthorizedException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 describe('AuthService - register', () => {
@@ -617,6 +622,146 @@ describe('AuthService - forgotPassword', () => {
 
     expect(result).toEqual({
       message: 'Mật khẩu tạm thời đã được gửi vào email của bạn.',
+    });
+
+    jest.restoreAllMocks();
+  });
+});
+
+describe('AuthService - changePassword', () => {
+  let service: AuthService;
+
+  const prismaMock = {
+    users: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+
+  const jwtServiceMock = {
+    sign: jest.fn(),
+  };
+
+  const mailServiceMock = {
+    sendPasswordChangedSuccessEmail: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    service = new AuthService(
+      prismaMock as any,
+      jwtServiceMock as any,
+      mailServiceMock as any,
+    );
+  });
+
+  it('should reject when user does not exist', async () => {
+    prismaMock.users.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.changePassword(100, 'old-password', 'new-password'),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prismaMock.users.update).not.toHaveBeenCalled();
+    expect(
+      mailServiceMock.sendPasswordChangedSuccessEmail,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should reject when user logs in with Google', async () => {
+    prismaMock.users.findUnique.mockResolvedValue({
+      id: 100,
+      email: 'user@example.com',
+      password: '',
+    });
+
+    await expect(
+      service.changePassword(100, 'old-password', 'new-password'),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prismaMock.users.update).not.toHaveBeenCalled();
+    expect(
+      mailServiceMock.sendPasswordChangedSuccessEmail,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should reject when current password is incorrect', async () => {
+    prismaMock.users.findUnique.mockResolvedValue({
+      id: 100,
+      email: 'user@example.com',
+      password: 'hashed-old-password',
+    });
+
+    const bcrypt = require('bcrypt');
+
+    jest.spyOn(bcrypt, 'compare').mockResolvedValue(false);
+
+    await expect(
+      service.changePassword(100, 'wrong-password', 'new-password'),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(bcrypt.compare).toHaveBeenCalledWith(
+      'wrong-password',
+      'hashed-old-password',
+    );
+
+    expect(prismaMock.users.update).not.toHaveBeenCalled();
+    expect(
+      mailServiceMock.sendPasswordChangedSuccessEmail,
+    ).not.toHaveBeenCalled();
+
+    jest.restoreAllMocks();
+  });
+
+  it('should change password successfully', async () => {
+    prismaMock.users.findUnique.mockResolvedValue({
+      id: 100,
+      email: 'user@example.com',
+      password: 'hashed-old-password',
+    });
+
+    prismaMock.users.update.mockResolvedValue({
+      id: 100,
+      email: 'user@example.com',
+      password: 'hashed-new-password',
+    });
+
+    const bcrypt = require('bcrypt');
+
+    jest.spyOn(bcrypt, 'compare').mockResolvedValue(true);
+    jest
+      .spyOn(bcrypt, 'hash')
+      .mockResolvedValue('hashed-new-password');
+
+    const result = await service.changePassword(
+      100,
+      'old-password',
+      'new-password',
+    );
+
+    expect(bcrypt.compare).toHaveBeenCalledWith(
+      'old-password',
+      'hashed-old-password',
+    );
+
+    expect(bcrypt.hash).toHaveBeenCalledWith('new-password', 10);
+
+    expect(prismaMock.users.update).toHaveBeenCalledWith({
+      where: {
+        id: 100,
+      },
+      data: {
+        password: 'hashed-new-password',
+      },
+    });
+
+    expect(
+      mailServiceMock.sendPasswordChangedSuccessEmail,
+    ).toHaveBeenCalledWith('user@example.com');
+
+    expect(result).toEqual({
+      message: 'Đổi mật khẩu thành công',
     });
 
     jest.restoreAllMocks();
