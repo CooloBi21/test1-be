@@ -519,3 +519,106 @@ describe('AuthService - verifyEmail', () => {
     });
   });
 });
+
+describe('AuthService - forgotPassword', () => {
+  let service: AuthService;
+
+  const prismaMock = {
+    users: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+
+  const jwtServiceMock = {
+    sign: jest.fn(),
+  };
+
+  const mailServiceMock = {
+    sendForgotPasswordEmail: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    service = new AuthService(
+      prismaMock as any,
+      jwtServiceMock as any,
+      mailServiceMock as any,
+    );
+  });
+
+  it('should return generic message when email does not exist', async () => {
+    prismaMock.users.findUnique.mockResolvedValue(null);
+
+    const result = await service.forgotPassword('unknown@example.com');
+
+    expect(prismaMock.users.findUnique).toHaveBeenCalledWith({
+      where: {
+        email: 'unknown@example.com',
+      },
+    });
+
+    expect(prismaMock.users.update).not.toHaveBeenCalled();
+    expect(mailServiceMock.sendForgotPasswordEmail).not.toHaveBeenCalled();
+
+    expect(result).toEqual({
+      message:
+        'Nếu email tồn tại trong hệ thống, mật khẩu mới sẽ được gửi.',
+    });
+  });
+
+  it('should generate temporary password, update user and send email', async () => {
+    prismaMock.users.findUnique.mockResolvedValue({
+      id: 100,
+      email: 'user@example.com',
+    });
+
+    prismaMock.users.update.mockResolvedValue({
+      id: 100,
+      email: 'user@example.com',
+    });
+
+    const bcrypt = require('bcrypt');
+
+    jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashed-temp-password');
+
+    const crypto = require('crypto');
+
+    jest
+      .spyOn(crypto, 'randomBytes')
+      .mockReturnValue(Buffer.from('temp1234'));
+
+    const result = await service.forgotPassword('user@example.com');
+
+    expect(prismaMock.users.findUnique).toHaveBeenCalledWith({
+      where: {
+        email: 'user@example.com',
+      },
+    });
+
+    expect(bcrypt.hash).toHaveBeenCalledWith('74656d7031323334', 10);
+
+    expect(prismaMock.users.update).toHaveBeenCalledWith({
+      where: {
+        id: 100,
+      },
+      data: {
+        password: 'hashed-temp-password',
+      },
+    });
+
+    expect(
+      mailServiceMock.sendForgotPasswordEmail,
+    ).toHaveBeenCalledWith(
+      'user@example.com',
+      '74656d7031323334',
+    );
+
+    expect(result).toEqual({
+      message: 'Mật khẩu tạm thời đã được gửi vào email của bạn.',
+    });
+
+    jest.restoreAllMocks();
+  });
+});
