@@ -767,3 +767,70 @@ describe('AuthService - changePassword', () => {
     jest.restoreAllMocks();
   });
 });
+
+describe('AuthService - updateProfile', () => {
+  let service: AuthService;
+
+  const prismaMock = {
+    users: {
+      update: jest.fn(),
+    },
+  };
+
+  const jwtServiceMock = {
+    sign: jest.fn(),
+  };
+
+  const mailServiceMock = {
+    sendVerificationEmail: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    service = new AuthService(
+      prismaMock as any,
+      jwtServiceMock as any,
+      mailServiceMock as any,
+    );
+  });
+
+  it('should update user profile successfully', async () => {
+    prismaMock.users.update.mockResolvedValue({
+      id: 100,
+      full_name: 'Nguyễn Văn A',
+      email: 'user@example.com',
+      phone: '0901234567',
+      password: 'hashed-password',
+      verification_token: 'verification-token',
+      role: 'renter',
+    });
+
+    const result = await service.updateProfile(
+      100,
+      'Nguyễn Văn A',
+      '0901234567',
+    );
+
+    expect(prismaMock.users.update).toHaveBeenCalledWith({
+      where: {
+        id: 100,
+      },
+      data: {
+        full_name: 'Nguyễn Văn A',
+        phone: '0901234567',
+      },
+    });
+
+    expect(result).toEqual({
+      id: 100,
+      full_name: 'Nguyễn Văn A',
+      email: 'user@example.com',
+      phone: '0901234567',
+      role: 'renter',
+    });
+
+    expect(result).not.toHaveProperty('password');
+    expect(result).not.toHaveProperty('verification_token');
+  });
+});
