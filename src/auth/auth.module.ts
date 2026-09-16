@@ -13,7 +13,7 @@ import { MailService } from './mail.service';
     PassportModule,
     JwtModule.registerAsync({
       useFactory: () => ({
-        secret: process.env.JWT_SECRET || 'secretKey',
+        secret: process.env.JWT_SECRET,
         signOptions: { expiresIn: '7d' },
       }),
     }),

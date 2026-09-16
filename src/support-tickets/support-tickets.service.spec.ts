@@ -201,5 +201,24 @@ describe('SupportTicketsService', () => {
         entity_id: 25,
       });
     });
+
+    it('should throw NotFoundException when the ticket does not exist', async () => {
+      const error = new Error('Record not found');
+      (error as any).code = 'P2025';
+
+      prisma.support_tickets.update.mockRejectedValue(error);
+
+      await expect(
+        service.replyTicket(
+          999,
+          'Phản hồi cho ticket không tồn tại',
+          'resolved',
+        ),
+      ).rejects.toThrow('Ticket #999 không tồn tại');
+
+      expect(
+        notificationsService.createNotification,
+      ).not.toHaveBeenCalled();
+    });
   });
 });
