@@ -56,6 +56,8 @@ model users {
   phone               String?            @db.VarChar(20)
   avatar              String?            @db.VarChar(255)
   role                Role?              @default(renter)
+  role_id             Int?
+  role_ref            roles?             @relation(fields: [role_id], references: [id])
   created_at          DateTime?          @default(now()) @db.Timestamp(6)
   is_active           Boolean            @default(false)
   verification_token  String?            @db.VarChar(255)
@@ -229,4 +231,38 @@ enum TicketStatus {
   open
   in_progress
   resolved
+}
+
+model roles {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(50)
+  description String?  @db.VarChar(255)
+  created_at  DateTime @default(now())
+
+  users            users[]
+  role_permissions role_permissions[]
+
+  @@map("roles")
+}
+
+model permissions {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  created_at  DateTime @default(now())
+
+  role_permissions role_permissions[]
+
+  @@map("permissions")
+}
+
+model role_permissions {
+  role_id       Int
+  permission_id Int
+
+  role       roles       @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  permission permissions @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+
+  @@id([role_id, permission_id])
+  @@map("role_permissions")
 }

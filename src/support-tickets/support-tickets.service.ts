@@ -31,10 +31,25 @@ export class SupportTicketsService {
   }
 
   async replyTicket(id: number, admin_reply: string, status: any) {
-    const ticket = await this.prisma.support_tickets.update({
-      where: { id },
-      data: { admin_reply, status },
-    });
+    let ticket;
+
+    try {
+      ticket = await this.prisma.support_tickets.update({
+        where: { id },
+        data: { admin_reply, status },
+      });
+    } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2025'
+      ) {
+        throw new NotFoundException(`Ticket #${id} không tồn tại`);
+      }
+
+      throw error;
+    }
 
     await this.notificationsService.createNotification({
       user_id: ticket.user_id,

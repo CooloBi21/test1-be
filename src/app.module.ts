@@ -7,6 +7,7 @@ import { RoomsModule } from './rooms/rooms.module';
 import { CandlestickModule } from './candlestick/candlestick.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { AuthorizationModule } from './auth/authorization/authorization.module';
 import { SavedPostsModule } from './saved-posts/saved-posts.module';
 import { RoomViewsModule } from './room-views/room-views.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -21,6 +22,7 @@ import { SupportTicketsModule } from './support-tickets/support-tickets.module';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
+    AuthorizationModule,
     DatabaseModule,
     ProvincesModule,
     DistrictsModule,

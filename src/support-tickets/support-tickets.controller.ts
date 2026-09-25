@@ -3,6 +3,8 @@ import { SupportTicketsService } from './support-tickets.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { Permissions } from '../auth/decorators/permissions.decorator';
 
 @Controller('api/support-tickets')
 export class SupportTicketsController {
@@ -20,15 +22,17 @@ export class SupportTicketsController {
     return this.ticketsService.getUserTickets(req.user.id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin')
+  @Permissions('support.read')
   @Get('admin')
   async getAdminTickets(@Query('status') status?: any) {
     return this.ticketsService.getAdminTickets(status);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
   @Roles('admin')
+  @Permissions('support.update')
   @Patch('admin/:id')
   async replyTicket(
     @Param('id', ParseIntPipe) id: number,

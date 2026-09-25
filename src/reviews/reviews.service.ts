@@ -45,67 +45,159 @@ export class ReviewsService {
 
   async getRoomReviews(roomId: number, options: ReviewQueryOptions = {}) {
     const sort = options.sort || 'latest';
-    const viewerId = Number.isFinite(options.viewerId) ? Number(options.viewerId) : 0;
+    const viewerId = Number.isFinite(options.viewerId)
+      ? Number(options.viewerId)
+      : 0;
 
-    const orderClause =
+    const orderBy =
       sort === 'rating_desc'
-        ? 'r.rating DESC, r.created_at DESC'
+        ? [
+            { rating: 'desc' as const },
+            { created_at: 'desc' as const },
+          ]
         : sort === 'rating_asc'
-          ? 'r.rating ASC, r.created_at DESC'
-          : 'r.created_at DESC';
+          ? [
+              { rating: 'asc' as const },
+              { created_at: 'desc' as const },
+            ]
+          : {
+              created_at: 'desc' as const,
+            };
 
-    return this.prisma.$queryRawUnsafe(
-      `
-      SELECT
-        r.id,
-        r.user_id,
-        r.room_id,
-        r.rating,
-        r.comment,
-        '[]'::jsonb AS images,
-        r.owner_reply,
-        r.owner_reply_at,
-        r.created_at,
-        r.updated_at,
-        (
-          SELECT COALESCE(jsonb_object_agg(reaction_type, reaction_count), '{}'::jsonb)
-          FROM (
-            SELECT reaction_type, COUNT(*)::int AS reaction_count
-            FROM review_reactions rr
-            WHERE rr.review_id = r.id
-            GROUP BY reaction_type
-          ) reaction_counts
-        ) AS reactions,
-        (
-          SELECT COALESCE(jsonb_agg(rr_me.reaction_type), '[]'::jsonb)
-          FROM review_reactions rr_me
-          WHERE rr_me.review_id = r.id
-            AND rr_me.user_id = $2
-        ) AS current_user_reactions,
-        json_build_object(
-          'id', u.id,
-          'full_name', u.full_name,
-          'avatar', u.avatar
-        ) AS user,
-        EXISTS (
-          SELECT 1
-          FROM room_views rv
-          WHERE rv.room_id = r.room_id
-            AND rv.user_id = r.user_id
-        ) OR EXISTS (
-          SELECT 1
-          FROM conversations c
-          WHERE c.room_id = r.room_id
-            AND (c.user_1_id = r.user_id OR c.user_2_id = r.user_id)
-        ) AS verified_interaction
-      FROM reviews r
-      JOIN users u ON u.id = r.user_id
-      WHERE r.room_id = $1
-      ORDER BY ${orderClause}
-      `,
-      roomId,
-      viewerId,
-    );
+    const reviews = await this.prisma.reviews.findMany({
+      where: {
+        room_id: roomId,
+      },
+      select: {
+        id: true,
+        user_id: true,
+        room_id: true,
+        rating: true,
+        comment: true,
+        owner_reply: true,
+        owner_reply_at: true,
+        created_at: true,
+        updated_at: true,
+
+        user: {
+          select: {
+            id: true,
+            full_name: true,
+            avatar: true,
+          },
+        },
+
+        reactions: {
+          select: {
+            user_id: true,
+            reaction_type: true,
+          },
+        },
+      },
+      orderBy,
+    });
+
+    if (reviews.length === 0) {
+      return [];
+    }
+
+    const reviewerIds = [
+      ...new Set(reviews.map((review) => review.user_id)),
+    ];
+
+    const [roomViews, conversations] = await Promise.all([
+      this.prisma.room_views.findMany({
+        where: {
+          room_id: roomId,
+          user_id: {
+            in: reviewerIds,
+          },
+        },
+        select: {
+          user_id: true,
+        },
+      }),
+
+      this.prisma.conversations.findMany({
+        where: {
+          room_id: roomId,
+          OR: [
+            {
+              user_1_id: {
+                in: reviewerIds,
+              },
+            },
+            {
+              user_2_id: {
+                in: reviewerIds,
+              },
+            },
+          ],
+        },
+        select: {
+          user_1_id: true,
+          user_2_id: true,
+        },
+      }),
+    ]);
+
+    const verifiedUserIds = new Set<number>();
+
+    for (const view of roomViews) {
+      verifiedUserIds.add(view.user_id);
+    }
+
+    for (const conversation of conversations) {
+      if (reviewerIds.includes(conversation.user_1_id)) {
+        verifiedUserIds.add(conversation.user_1_id);
+      }
+
+      if (reviewerIds.includes(conversation.user_2_id)) {
+        verifiedUserIds.add(conversation.user_2_id);
+      }
+    }
+
+    return reviews.map((review) => {
+      const reactions = review.reactions.reduce(
+        (acc, reaction) => {
+          acc[reaction.reaction_type] =
+            (acc[reaction.reaction_type] || 0) + 1;
+
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
+
+      const currentUserReactions =
+        viewerId > 0
+          ? review.reactions
+              .filter((reaction) => reaction.user_id === viewerId)
+              .map((reaction) => reaction.reaction_type)
+          : [];
+
+      return {
+        id: review.id,
+        user_id: review.user_id,
+        room_id: review.room_id,
+        rating: review.rating,
+        comment: review.comment,
+
+        // Preserve the existing API response.
+        images: [],
+
+        owner_reply: review.owner_reply,
+        owner_reply_at: review.owner_reply_at,
+        created_at: review.created_at,
+        updated_at: review.updated_at,
+
+        reactions,
+        current_user_reactions: currentUserReactions,
+
+        user: review.user,
+
+        verified_interaction: verifiedUserIds.has(review.user_id),
+      };
+    });
   }
 
   async replyAsOwner(ownerId: number, reviewId: number, reply: string) {

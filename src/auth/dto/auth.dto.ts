@@ -43,7 +43,10 @@ export class LoginDto {
 }
 
 export class ForgotPasswordDto {
-  @ApiProperty({ example: 'user@gmail.com', description: 'Email nhận mật khẩu tạm thời' })
+  @ApiProperty({
+    example: 'user@gmail.com',
+    description: 'Email dùng để khôi phục mật khẩu',
+  })
   @IsEmail({}, { message: 'Email không đúng định dạng' })
   @IsNotEmpty({ message: 'Email không được để trống' })
   email: string;

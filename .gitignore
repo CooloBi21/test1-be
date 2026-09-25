@@ -22,3 +22,6 @@ dist/
 *.sw?
 
 /src/generated/prisma
+
+# Coverage
+coverage/
